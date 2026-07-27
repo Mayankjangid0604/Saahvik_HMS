@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("/fonts/inter-variable.woff2") format("woff2-variations");
+}
+
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url("/fonts/jetbrains-mono-variable.woff2") format("woff2-variations");
+}
+
+@theme {
+  --color-primary: #1b2a4a;
+  --color-primary-600: #24365c;
+  --color-primary-700: #15213a;
+  --color-accent: #b08d57;
+  --color-accent-600: #9a7a49;
+  --color-accent-50: #f7f1e7;
+  --color-surface: #f8f5ef;
+  --color-ink: #1a1a1a;
+  --color-muted: #64748b;
+
+  --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", monospace;
+}
+
+html {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background-color: var(--color-surface);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dense functional UI: no decorative animation, keep transitions minimal */
+* {
+  scrollbar-width: thin;
+}
