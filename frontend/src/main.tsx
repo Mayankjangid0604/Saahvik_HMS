@@ -1,10 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./index.css";
 
-import { AuthProvider, useAuth } from "@/features/auth/AuthContext";
+import { AuthProvider } from "@/features/auth/AuthContext";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
@@ -55,17 +55,8 @@ const queryClient = new QueryClient({
   },
 });
 
-/**
- * Public entry at "/": signed-out visitors get the landing page,
- * signed-in users go straight to their dashboard.
- */
-function HomeRoute() {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />;
-}
-
 const router = createBrowserRouter([
-  { path: "/", element: <HomeRoute /> },
+  { path: "/", element: <LandingPage /> },
   { path: "/login", element: <LoginPage /> },
   { path: "/signup", element: <SignupPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
