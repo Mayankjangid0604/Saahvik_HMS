@@ -21,7 +21,7 @@ export function TwoFactorPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const from = (location.state as { from?: string } | null)?.from ?? "/";
+  const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
 
   const {
     register,
