@@ -8,6 +8,7 @@ import { useAuth } from "./AuthContext";
 import { signup } from "@/api/auth.api";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { FormField } from "@/components/ui/FormField";
 import { useToast } from "@/components/ui/Toast";
 import { emailSchema, passwordSchema, phoneSchema, requiredString } from "@/lib/validators";
@@ -58,7 +59,7 @@ export function SignupPage() {
           <Input type="tel" placeholder="9829012345" maxLength={10} error={!!errors.phone} {...register("phone")} />
         </FormField>
         <FormField label="Password" error={errors.password?.message} required hint="At least 8 characters">
-          <Input type="password" autoComplete="new-password" error={!!errors.password} {...register("password")} />
+          <PasswordInput autoComplete="new-password" error={!!errors.password} {...register("password")} />
         </FormField>
         <Button type="submit" className="w-full" isLoading={mutation.isPending}>
           Create account

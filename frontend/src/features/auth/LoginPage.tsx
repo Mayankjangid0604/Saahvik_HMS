@@ -8,6 +8,7 @@ import { useAuth } from "./AuthContext";
 import { login as loginApi } from "@/api/auth.api";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { FormField } from "@/components/ui/FormField";
 import { useToast } from "@/components/ui/Toast";
 import { emailSchema } from "@/lib/validators";
@@ -57,8 +58,7 @@ export function LoginPage() {
           />
         </FormField>
         <FormField label="Password" error={errors.password?.message} required>
-          <Input
-            type="password"
+          <PasswordInput
             placeholder="••••••••"
             autoComplete="current-password"
             error={!!errors.password}

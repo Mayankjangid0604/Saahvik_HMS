@@ -101,6 +101,8 @@ interface RoomSeed {
   type: Room["type"];
   capacity: number;
   rent: number; // paisa
+  /** Room-level fixed fee: residents' fees lock to the room amount */
+  fixed?: boolean;
 }
 
 const roomSeeds: RoomSeed[] = [
@@ -109,13 +111,13 @@ const roomSeeds: RoomSeed[] = [
   { num: 103, floor: 1, type: "triple", capacity: 3, rent: 450000 },
   { num: 104, floor: 1, type: "single", capacity: 1, rent: 800000 },
   { num: 105, floor: 1, type: "triple", capacity: 3, rent: 450000 },
-  { num: 106, floor: 1, type: "dorm", capacity: 4, rent: 380000 },
+  { num: 106, floor: 1, type: "dorm", capacity: 4, rent: 380000, fixed: true },
   { num: 201, floor: 2, type: "double", capacity: 2, rent: 570000 },
   { num: 202, floor: 2, type: "double", capacity: 2, rent: 570000 },
   { num: 203, floor: 2, type: "triple", capacity: 3, rent: 470000 },
   { num: 204, floor: 2, type: "single", capacity: 1, rent: 820000 },
   { num: 205, floor: 2, type: "triple", capacity: 3, rent: 470000 },
-  { num: 206, floor: 2, type: "dorm", capacity: 4, rent: 400000 },
+  { num: 206, floor: 2, type: "dorm", capacity: 4, rent: 400000, fixed: true },
   { num: 301, floor: 3, type: "double", capacity: 2, rent: 600000 },
   { num: 302, floor: 3, type: "double", capacity: 2, rent: 600000 },
   { num: 303, floor: 3, type: "triple", capacity: 3, rent: 500000 },
@@ -129,6 +131,8 @@ export const rooms: Room[] = roomSeeds.map((s) => ({
   type: s.type,
   capacity: s.capacity,
   monthlyRentPaisa: s.rent,
+  feeMode: s.fixed ? "fixed" : "variable",
+  fixedFeeAmountPaisa: s.fixed ? s.rent : null,
   occupiedCount: 0,
   beds: Array.from({ length: s.capacity }, (_, i): Bed => ({
     id: `bed_${s.num}_${String.fromCharCode(65 + i)}`,

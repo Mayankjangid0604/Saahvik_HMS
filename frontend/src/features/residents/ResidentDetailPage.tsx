@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowLeftRight, IndianRupee, LogOut, Phone } from "lucide-re
 import { getResident } from "@/api/resident.api";
 import { checkoutResident } from "@/api/resident.api";
 import { listPayments } from "@/api/payment.api";
+import { getAdmissionFormConfig } from "@/api/settings.api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -40,6 +41,11 @@ export function ResidentDetailPage() {
   const { data: resident, isLoading } = useQuery({
     queryKey: ["residents", id],
     queryFn: () => getResident(id),
+  });
+
+  const { data: formConfig } = useQuery({
+    queryKey: ["admission-form"],
+    queryFn: getAdmissionFormConfig,
   });
 
   const { data: payments } = useQuery({
@@ -151,6 +157,19 @@ export function ResidentDetailPage() {
               {resident.notes && <Detail label="Notes" value={resident.notes} />}
             </CardBody>
           </Card>
+
+          {resident.admissionData && Object.values(resident.admissionData).some(Boolean) && (
+            <Card>
+              <CardHeader title="Admission form" subtitle="As filled at admission" />
+              <CardBody className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+                {(formConfig?.fields ?? [])
+                  .filter((f) => resident.admissionData?.[f.key])
+                  .map((f) => (
+                    <Detail key={f.key} label={f.label} value={resident.admissionData![f.key]} />
+                  ))}
+              </CardBody>
+            </Card>
+          )}
 
           <Card>
             <CardHeader title="Payment history" subtitle={payments ? `${payments.length} payments` : undefined} />

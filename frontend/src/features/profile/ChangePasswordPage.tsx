@@ -8,7 +8,7 @@ import { changePassword } from "@/api/auth.api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { FormField } from "@/components/ui/FormField";
 import { useToast } from "@/components/ui/Toast";
 import { passwordSchema } from "@/lib/validators";
@@ -60,13 +60,13 @@ export function ChangePasswordPage() {
         <CardBody>
           <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-3">
             <FormField label="Current password" error={errors.currentPassword?.message} required>
-              <Input type="password" autoComplete="current-password" error={!!errors.currentPassword} {...register("currentPassword")} />
+              <PasswordInput autoComplete="current-password" error={!!errors.currentPassword} {...register("currentPassword")} />
             </FormField>
             <FormField label="New password" error={errors.newPassword?.message} required hint="At least 8 characters">
-              <Input type="password" autoComplete="new-password" error={!!errors.newPassword} {...register("newPassword")} />
+              <PasswordInput autoComplete="new-password" error={!!errors.newPassword} {...register("newPassword")} />
             </FormField>
             <FormField label="Confirm new password" error={errors.confirmPassword?.message} required>
-              <Input type="password" autoComplete="new-password" error={!!errors.confirmPassword} {...register("confirmPassword")} />
+              <PasswordInput autoComplete="new-password" error={!!errors.confirmPassword} {...register("confirmPassword")} />
             </FormField>
             <div className="flex justify-end">
               <Button type="submit" isLoading={mutation.isPending}>

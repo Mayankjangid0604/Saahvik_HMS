@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
-import { ArrowLeftRight, BedDouble, Layers, Plus, Search } from "lucide-react";
-import { listRooms } from "@/api/hostel.api";
+import { ArrowLeftRight, BedDouble, Layers, Plus, Search, Settings2 } from "lucide-react";
+import { listAllRooms, listRooms } from "@/api/hostel.api";
 import type { Room } from "@/api/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +18,15 @@ import { usePagination } from "@/hooks/usePagination";
 import { AddRoomDialog } from "./AddRoomDialog";
 import { BulkAddDialog } from "./BulkAddDialog";
 import { RoomTransferDialog } from "./RoomTransferDialog";
+import { RoomFeeDialog } from "./RoomFeeDialog";
+
+const typeLabels: Record<Room["type"], string> = {
+  single: "Single",
+  double: "Double",
+  triple: "Triple",
+  quad: "Quad",
+  dorm: "Dorm",
+};
 
 export function RoomsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -32,6 +41,12 @@ export function RoomsPage() {
   const [addOpen, setAddOpen] = useState(searchParams.get("add") === "1");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [feeRoom, setFeeRoom] = useState<Room | null>(null);
+
+  // Filter options come from the rooms that actually exist (Change 4)
+  const { data: allRooms } = useQuery({ queryKey: ["rooms", "all"], queryFn: listAllRooms });
+  const floorOptions = [...new Set((allRooms ?? []).map((r) => r.floor))].sort((a, b) => a - b);
+  const typeOptions = [...new Set((allRooms ?? []).map((r) => r.type))];
 
   const { data, isLoading } = useQuery({
     queryKey: ["rooms", "list", { page, pageSize, debouncedSearch, floor, type, sorting }],
@@ -61,7 +76,7 @@ export function RoomsPage() {
       {
         accessorKey: "type",
         header: "Type",
-        cell: ({ getValue }) => <span className="capitalize">{getValue<string>()}</span>,
+        cell: ({ getValue }) => typeLabels[getValue<Room["type"]>()],
       },
       {
         id: "beds",
@@ -86,8 +101,23 @@ export function RoomsPage() {
       },
       {
         accessorKey: "monthlyRentPaisa",
-        header: "Rent / bed",
-        cell: ({ getValue }) => <MoneyDisplay paisa={getValue<number>()} />,
+        header: "Fee / bed",
+        cell: ({ row }) => {
+          const r = row.original;
+          if (r.feeMode === "fixed" && r.fixedFeeAmountPaisa != null) {
+            return (
+              <span className="flex items-center gap-1.5">
+                <MoneyDisplay paisa={r.fixedFeeAmountPaisa} />
+                <Badge tone="gold">Fixed</Badge>
+              </span>
+            );
+          }
+          return r.monthlyRentPaisa > 0 ? (
+            <MoneyDisplay paisa={r.monthlyRentPaisa} />
+          ) : (
+            <span className="text-muted">Per resident</span>
+          );
+        },
       },
     ],
     [],
@@ -141,7 +171,7 @@ export function RoomsPage() {
             setPage(1);
           }}
           placeholder="All floors"
-          options={[1, 2, 3, 4].map((f) => ({ value: String(f), label: `Floor ${f}` }))}
+          options={floorOptions.map((f) => ({ value: String(f), label: `Floor ${f}` }))}
         />
         <Select
           className="w-36"
@@ -152,10 +182,7 @@ export function RoomsPage() {
           }}
           options={[
             { value: "all", label: "All types" },
-            { value: "single", label: "Single" },
-            { value: "double", label: "Double" },
-            { value: "triple", label: "Triple" },
-            { value: "dorm", label: "Dorm" },
+            ...typeOptions.map((t) => ({ value: t, label: typeLabels[t] })),
           ]}
         />
       </div>
@@ -179,7 +206,16 @@ export function RoomsPage() {
           </Button>
         }
         renderExpanded={(row) => (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className="flex min-w-40 items-center gap-2 rounded-md border border-dashed border-slate-300 bg-white px-3 py-2 text-xs font-medium text-muted hover:border-accent hover:text-accent-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFeeRoom(row.original);
+              }}
+            >
+              <Settings2 className="h-3.5 w-3.5" /> Fee settings
+            </button>
             {row.original.beds.map((bed) => (
               <div
                 key={bed.id}
@@ -217,6 +253,7 @@ export function RoomsPage() {
       />
       <BulkAddDialog isOpen={bulkOpen} onClose={() => setBulkOpen(false)} />
       <RoomTransferDialog isOpen={transferOpen} onClose={() => setTransferOpen(false)} />
+      <RoomFeeDialog room={feeRoom} onClose={() => setFeeRoom(null)} />
     </div>
   );
 }

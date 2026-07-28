@@ -83,8 +83,12 @@ export interface AuthSession {
 
 // ---------- Rooms & Beds ----------
 
-export type RoomType = "single" | "double" | "triple" | "dorm";
+/** Room type implies capacity: single=1, double=2, triple=3, quad=4; dorm is custom. */
+export type RoomType = "single" | "double" | "triple" | "quad" | "dorm";
 export type BedStatus = "occupied" | "vacant" | "maintenance";
+
+/** How resident fees work for a room. "fixed" locks every resident's fee to the room's amount. */
+export type RoomFeeMode = "fixed" | "variable";
 
 export interface Bed {
   id: string;
@@ -102,6 +106,9 @@ export interface Room {
   type: RoomType;
   capacity: number;
   monthlyRentPaisa: number;
+  feeMode: RoomFeeMode;
+  /** Set when feeMode is "fixed"; null otherwise */
+  fixedFeeAmountPaisa: number | null;
   beds: Bed[];
   occupiedCount: number;
   notes?: string;
@@ -112,7 +119,8 @@ export interface CreateRoomInput {
   floor: number;
   type: RoomType;
   capacity: number;
-  monthlyRentPaisa: number;
+  feeMode: RoomFeeMode;
+  fixedFeeAmountPaisa: number | null;
   notes?: string;
 }
 
@@ -122,7 +130,13 @@ export interface BulkAddRoomsInput {
   count: number;
   type: RoomType;
   capacity: number;
-  monthlyRentPaisa: number;
+  feeMode: RoomFeeMode;
+  fixedFeeAmountPaisa: number | null;
+}
+
+export interface UpdateRoomFeeInput {
+  feeMode: RoomFeeMode;
+  fixedFeeAmountPaisa: number | null;
 }
 
 export interface RoomTransferInput {
@@ -162,6 +176,8 @@ export interface Resident {
   depositPaisa: number;
   duesPaisa: number;
   notes?: string;
+  /** Answers to the configurable admission form, keyed by field key. */
+  admissionData?: Record<string, string>;
 }
 
 export interface ResidentListParams extends ListParams {
@@ -493,12 +509,29 @@ export interface NotificationPreferences {
 
 // ---------- Settings ----------
 
+export type AdmissionFieldType =
+  | "text"
+  | "number"
+  | "date"
+  | "phone"
+  | "select"
+  | "textarea"
+  | "file"
+  | "auto"; // system-generated, read-only (e.g. Form No.)
+
 export interface AdmissionFormField {
   key: string;
   label: string;
-  enabled: boolean;
+  type: AdmissionFieldType;
   required: boolean;
-  builtIn: boolean;
+  /** Seeded default field (from the Sunrise Hostel paper form) vs user-added custom field. */
+  isDefault: boolean;
+  /** Choices for type "select" */
+  options?: string[];
+  /** Extra format check applied on top of the type */
+  validation?: "aadhaar" | "pincode";
+  /** Auto-fill behavior: "today" pre-fills today's date; "formNo" generates a form number */
+  autoFill?: "today" | "formNo";
 }
 
 export interface AdmissionFormConfig {

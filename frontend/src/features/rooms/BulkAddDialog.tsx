@@ -3,23 +3,34 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { bulkAddRooms } from "@/api/hostel.api";
+import type { RoomType } from "@/api/types";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { FormField } from "@/components/ui/FormField";
 import { useToast } from "@/components/ui/Toast";
-import { rupeeAmountSchema } from "@/lib/validators";
 import { rupeesToPaisa } from "@/lib/format";
+import { ROOM_TYPE_OPTIONS, roomCapacityFor } from "./AddRoomDialog";
 
-const schema = z.object({
-  floor: z.coerce.number().int().min(0),
-  startNumber: z.coerce.number().int().min(1, "Starting number required"),
-  count: z.coerce.number().int().min(1, "At least 1").max(50, "Max 50 at a time"),
-  type: z.enum(["single", "double", "triple", "dorm"]),
-  capacity: z.coerce.number().int().min(1).max(12),
-  rentRupees: rupeeAmountSchema,
-});
+const schema = z
+  .object({
+    floor: z.coerce.number().int().min(0),
+    startNumber: z.coerce.number().int().min(1, "Starting number required"),
+    count: z.coerce.number().int().min(1, "At least 1").max(50, "Max 50 at a time"),
+    type: z.enum(["single", "double", "triple", "quad", "dorm"]),
+    dormBeds: z.coerce.number().optional(),
+    fixedFee: z.boolean(),
+    feeRupees: z.coerce.number().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.type === "dorm" && (!v.dormBeds || v.dormBeds < 1 || v.dormBeds > 24)) {
+      ctx.addIssue({ code: "custom", path: ["dormBeds"], message: "Enter 1–24 beds" });
+    }
+    if (v.fixedFee && (!v.feeRupees || v.feeRupees <= 0)) {
+      ctx.addIssue({ code: "custom", path: ["feeRupees"], message: "Enter the room fee" });
+    }
+  });
 type FormInput = z.input<typeof schema>;
 type FormValues = z.output<typeof schema>;
 
@@ -31,13 +42,16 @@ export function BulkAddDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
     register,
     handleSubmit,
     watch,
+    setValue,
     reset,
     formState: { errors },
   } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { floor: 4, startNumber: 401, count: 6, type: "double", capacity: 2 },
+    defaultValues: { floor: 4, startNumber: 401, count: 6, type: "double", dormBeds: 4, fixedFee: false },
   });
 
+  const type = watch("type") as RoomType;
+  const fixedFee = !!watch("fixedFee");
   const startNumber = Number(watch("startNumber"));
   const count = Number(watch("count"));
 
@@ -48,8 +62,9 @@ export function BulkAddDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
         startNumber: v.startNumber,
         count: v.count,
         type: v.type,
-        capacity: v.capacity,
-        monthlyRentPaisa: rupeesToPaisa(v.rentRupees),
+        capacity: roomCapacityFor(v.type, v.dormBeds),
+        feeMode: v.fixedFee ? "fixed" : "variable",
+        fixedFeeAmountPaisa: v.fixedFee ? rupeesToPaisa(v.feeRupees ?? 0) : null,
       }),
     onSuccess: ({ created }) => {
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
@@ -79,27 +94,44 @@ export function BulkAddDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
           </FormField>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <FormField label="Room type" required>
-            <Select
-              {...register("type")}
-              options={[
-                { value: "single", label: "Single" },
-                { value: "double", label: "Double sharing" },
-                { value: "triple", label: "Triple sharing" },
-                { value: "dorm", label: "Dormitory" },
-              ]}
-            />
+          <FormField
+            label="Room type"
+            required
+            hint={type !== "dorm" ? "Bed count set by type" : undefined}
+          >
+            <Select {...register("type")} options={ROOM_TYPE_OPTIONS} />
           </FormField>
-          <FormField label="Beds per room" error={errors.capacity?.message} required>
-            <Input type="number" min={1} max={12} error={!!errors.capacity} {...register("capacity")} />
-          </FormField>
+          {type === "dorm" && (
+            <FormField label="Beds per room" error={errors.dormBeds?.message} required>
+              <Input type="number" min={1} max={24} error={!!errors.dormBeds} {...register("dormBeds")} />
+            </FormField>
+          )}
         </div>
-        <FormField label="Monthly rent per bed (₹)" error={errors.rentRupees?.message} required>
-          <Input type="number" min={0} step="100" placeholder="5500" error={!!errors.rentRupees} {...register("rentRupees")} />
-        </FormField>
+
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-slate-200 px-3 py-2.5">
+          <input
+            type="checkbox"
+            className="mt-0.5 accent-accent"
+            checked={fixedFee}
+            onChange={(e) => setValue("fixedFee", e.target.checked)}
+          />
+          <span>
+            <span className="block text-sm font-medium text-ink">Fixed Room Fee</span>
+            <span className="block text-xs text-muted">
+              Applies to every room created — residents pay the room's fee, not a per-resident one.
+            </span>
+          </span>
+        </label>
+
+        {fixedFee && (
+          <FormField label="Room Fee (₹/month)" error={errors.feeRupees?.message} required>
+            <Input type="number" min={0} step="100" placeholder="5500" error={!!errors.feeRupees} {...register("feeRupees")} />
+          </FormField>
+        )}
+
         {startNumber > 0 && count > 0 && (
           <p className="rounded bg-accent-50 px-3 py-2 text-xs text-accent-600">
-            Will create Room {startNumber} … Room {Number(startNumber) + Number(count) - 1}
+            Will create Room {startNumber} … Room {startNumber + count - 1}
           </p>
         )}
         <div className="flex justify-end gap-2 pt-1">
