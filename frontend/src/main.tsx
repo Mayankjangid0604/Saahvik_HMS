@@ -9,6 +9,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
 
+import { LandingPage } from "@/pages/Landing/LandingPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { SignupPage } from "@/features/auth/SignupPage";
 import { ForgotPasswordPage } from "@/features/auth/ForgotPasswordPage";
@@ -55,19 +56,19 @@ const queryClient = new QueryClient({
 });
 
 const router = createBrowserRouter([
+  { path: "/", element: <LandingPage /> },
   { path: "/login", element: <LoginPage /> },
   { path: "/signup", element: <SignupPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   { path: "/2fa", element: <TwoFactorPage /> },
   {
-    path: "/",
     element: (
       <ProtectedRoute>
         <AppShell />
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <DashboardPage /> },
+      { path: "dashboard", element: <DashboardPage /> },
       { path: "setup", element: <HostelSetupPage /> },
       { path: "rooms", element: <RoomsPage /> },
       { path: "residents", element: <ResidentsPage /> },

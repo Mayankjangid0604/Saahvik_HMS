@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev"],
       "cwd": "frontend",
       "port": 5173
+    },
+    {
+      "name": "saahvik-frontend-5273",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5273", "--strictPort"],
+      "cwd": "frontend",
+      "port": 5273
     }
   ]
 }

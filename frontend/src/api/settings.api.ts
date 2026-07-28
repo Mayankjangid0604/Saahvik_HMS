@@ -1,6 +1,7 @@
 /** Mock settings API: org, admission form, subscription, export. */
 import type {
   AdmissionFormConfig,
+  AdmissionFormField,
   ExportJob,
   NotificationPreferences,
   Org,
@@ -21,35 +22,61 @@ export async function updateOrgSettings(input: Partial<Org>): Promise<Org> {
 
 // ---------- Admission form ----------
 
-const admissionForm: AdmissionFormConfig = {
-  fields: [
-    { key: "name", label: "Full name", enabled: true, required: true, builtIn: true },
-    { key: "phone", label: "Mobile number", enabled: true, required: true, builtIn: true },
-    { key: "email", label: "Email", enabled: true, required: false, builtIn: true },
-    { key: "photo", label: "Photo", enabled: true, required: false, builtIn: true },
-    { key: "guardianName", label: "Guardian name", enabled: true, required: true, builtIn: true },
-    { key: "guardianPhone", label: "Guardian phone", enabled: true, required: true, builtIn: true },
-    { key: "permanentAddress", label: "Permanent address", enabled: true, required: true, builtIn: true },
-    { key: "idDocument", label: "ID document", enabled: true, required: true, builtIn: true },
-    { key: "occupation", label: "Student / Working", enabled: true, required: true, builtIn: true },
-    { key: "institution", label: "College / Company", enabled: true, required: false, builtIn: true },
-    { key: "bloodGroup", label: "Blood group", enabled: false, required: false, builtIn: false },
-    { key: "vehicleNumber", label: "Vehicle number", enabled: false, required: false, builtIn: false },
-    { key: "emergencyContact", label: "Emergency contact", enabled: true, required: false, builtIn: false },
-  ],
-};
+/**
+ * Default fields, seeded from Sunrise Hostel's paper admission form.
+ * Personal / guardian / academic details only — room and fee fields live on
+ * the Room Assignment and Fee Assignment screens.
+ */
+const defaultAdmissionFields: AdmissionFormField[] = [
+  { key: "formNo", label: "Form No.", type: "auto", required: false, isDefault: true, autoFill: "formNo" },
+  { key: "formDate", label: "Date", type: "date", required: false, isDefault: true, autoFill: "today" },
+  { key: "photo", label: "Photo", type: "file", required: false, isDefault: true },
+  { key: "candidateName", label: "Name of Candidate", type: "text", required: true, isDefault: true },
+  { key: "fatherName", label: "Father's Name", type: "text", required: true, isDefault: true },
+  { key: "motherName", label: "Mother's Name", type: "text", required: false, isDefault: true },
+  { key: "contactNo", label: "Contact No.", type: "phone", required: true, isDefault: true },
+  { key: "fatherContactNo", label: "Father's Contact No.", type: "phone", required: false, isDefault: true },
+  { key: "motherContactNo", label: "Mother's Contact No.", type: "phone", required: false, isDefault: true },
+  { key: "alternateNo", label: "Alternate No.", type: "phone", required: false, isDefault: true },
+  { key: "dateOfBirth", label: "Date of Birth", type: "date", required: false, isDefault: true },
+  { key: "aadharNo", label: "Aadhar No.", type: "text", required: false, isDefault: true, validation: "aadhaar" },
+  { key: "coachingName", label: "Coaching/Institute Name", type: "text", required: false, isDefault: true },
+  { key: "class", label: "Class", type: "text", required: false, isDefault: true },
+  { key: "admissionType", label: "Admission Type", type: "select", required: false, isDefault: true, options: ["Fresher", "Repeater"] },
+  { key: "permanentAddress", label: "Permanent Address", type: "textarea", required: false, isDefault: true },
+  { key: "district", label: "District", type: "text", required: false, isDefault: true },
+  { key: "state", label: "State", type: "text", required: false, isDefault: true },
+  { key: "pincode", label: "Pincode", type: "text", required: false, isDefault: true, validation: "pincode" },
+  { key: "localGuardianName", label: "Local Guardian Name", type: "text", required: false, isDefault: true },
+  { key: "guardianRelation", label: "Guardian Relation", type: "text", required: false, isDefault: true },
+  { key: "guardianContactNo", label: "Guardian Contact No.", type: "phone", required: false, isDefault: true },
+  { key: "admissionDate", label: "Date of Admission", type: "date", required: false, isDefault: true, autoFill: "today" },
+  { key: "leavingDate", label: "Date of Leaving", type: "date", required: false, isDefault: true },
+  { key: "fatherQualification", label: "Father's Qualification", type: "text", required: false, isDefault: true },
+  { key: "fatherOccupation", label: "Father's Occupation", type: "text", required: false, isDefault: true },
+  { key: "motherQualification", label: "Mother's Qualification", type: "text", required: false, isDefault: true },
+  { key: "motherOccupation", label: "Mother's Occupation", type: "text", required: false, isDefault: true },
+];
+
+let admissionFields: AdmissionFormField[] = defaultAdmissionFields.map((f) => ({ ...f }));
 
 export async function getAdmissionFormConfig(): Promise<AdmissionFormConfig> {
   await delay(300);
-  return { fields: admissionForm.fields.map((f) => ({ ...f })) };
+  return { fields: admissionFields.map((f) => ({ ...f })) };
 }
 
 export async function updateAdmissionFormConfig(
   input: AdmissionFormConfig,
 ): Promise<AdmissionFormConfig> {
   await delay(500);
-  admissionForm.fields = input.fields.map((f) => ({ ...f }));
-  return { fields: [...admissionForm.fields] };
+  admissionFields = input.fields.map((f) => ({ ...f }));
+  return { fields: admissionFields.map((f) => ({ ...f })) };
+}
+
+export async function resetAdmissionFormConfig(): Promise<AdmissionFormConfig> {
+  await delay(400);
+  admissionFields = defaultAdmissionFields.map((f) => ({ ...f }));
+  return { fields: admissionFields.map((f) => ({ ...f })) };
 }
 
 // ---------- Subscription ----------

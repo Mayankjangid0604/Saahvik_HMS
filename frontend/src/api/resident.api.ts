@@ -59,6 +59,11 @@ export async function createResident(input: CreateResidentInput): Promise<Reside
     status: input.status ?? "active",
     roomNumber: room?.number,
     bedLabel: bed?.label,
+    // Fixed-fee rooms lock the fee to the room amount regardless of the form value
+    monthlyFeePaisa:
+      room?.feeMode === "fixed" && room.fixedFeeAmountPaisa != null
+        ? room.fixedFeeAmountPaisa
+        : input.monthlyFeePaisa,
     duesPaisa: 0,
   };
   residents.push(resident);

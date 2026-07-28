@@ -36,7 +36,7 @@ export interface NavGroup {
 
 export const navGroups: NavGroup[] = [
   {
-    items: [{ label: "Dashboard", to: "/", icon: LayoutDashboard, end: true }],
+    items: [{ label: "Dashboard", to: "/dashboard", icon: LayoutDashboard, end: true }],
   },
   {
     label: "Hostel",

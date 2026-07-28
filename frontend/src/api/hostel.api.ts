@@ -7,6 +7,7 @@ import type {
   Paginated,
   Room,
   RoomTransferInput,
+  UpdateRoomFeeInput,
 } from "./types";
 import { delay, nextId, org, paginate, rooms, residents, sortBy } from "./mock/db";
 
@@ -61,7 +62,9 @@ export async function createRoom(input: CreateRoomInput): Promise<Room> {
     floor: input.floor,
     type: input.type,
     capacity: input.capacity,
-    monthlyRentPaisa: input.monthlyRentPaisa,
+    monthlyRentPaisa: input.feeMode === "fixed" ? (input.fixedFeeAmountPaisa ?? 0) : 0,
+    feeMode: input.feeMode,
+    fixedFeeAmountPaisa: input.feeMode === "fixed" ? input.fixedFeeAmountPaisa : null,
     occupiedCount: 0,
     notes: input.notes,
     beds: Array.from({ length: input.capacity }, (_, i) => ({
@@ -88,7 +91,9 @@ export async function bulkAddRooms(input: BulkAddRoomsInput): Promise<{ created:
       floor: input.floor,
       type: input.type,
       capacity: input.capacity,
-      monthlyRentPaisa: input.monthlyRentPaisa,
+      monthlyRentPaisa: input.feeMode === "fixed" ? (input.fixedFeeAmountPaisa ?? 0) : 0,
+      feeMode: input.feeMode,
+      fixedFeeAmountPaisa: input.feeMode === "fixed" ? input.fixedFeeAmountPaisa : null,
       occupiedCount: 0,
       beds: Array.from({ length: input.capacity }, (_, b) => ({
         id: `${id}_${String.fromCharCode(65 + b)}`,
@@ -129,6 +134,30 @@ export async function transferResident(input: RoomTransferInput): Promise<{ ok: 
   resident.roomNumber = toRoom.number;
   resident.bedId = toBed.id;
   resident.bedLabel = toBed.label;
-  resident.monthlyFeePaisa = toRoom.monthlyRentPaisa;
+  // Fixed-fee rooms lock the resident's fee to the room amount
+  if (toRoom.feeMode === "fixed" && toRoom.fixedFeeAmountPaisa != null) {
+    resident.monthlyFeePaisa = toRoom.fixedFeeAmountPaisa;
+  } else if (toRoom.monthlyRentPaisa > 0) {
+    resident.monthlyFeePaisa = toRoom.monthlyRentPaisa;
+  }
   return { ok: true };
+}
+
+export async function updateRoomFee(roomId: string, input: UpdateRoomFeeInput): Promise<Room> {
+  await delay(450);
+  const room = rooms.find((r) => r.id === roomId);
+  if (!room) throw new Error("Room not found");
+  room.feeMode = input.feeMode;
+  room.fixedFeeAmountPaisa = input.feeMode === "fixed" ? input.fixedFeeAmountPaisa : null;
+  if (input.feeMode === "fixed" && input.fixedFeeAmountPaisa != null) {
+    room.monthlyRentPaisa = input.fixedFeeAmountPaisa;
+    // Residents already in the room move to the fixed fee
+    for (const bed of room.beds) {
+      if (bed.residentId) {
+        const r = residents.find((x) => x.id === bed.residentId);
+        if (r) r.monthlyFeePaisa = input.fixedFeeAmountPaisa;
+      }
+    }
+  }
+  return { ...room };
 }
