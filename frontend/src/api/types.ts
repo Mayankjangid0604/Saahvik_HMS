@@ -83,6 +83,57 @@ export interface AuthSession {
   org: Org;
 }
 
+// ---------- Signup wizard & social auth ----------
+// These shapes are consumed by mock flows today (no OAuth/OTP/payment
+// provider is wired yet) but are written as the future API contract.
+
+/** What a completed Google sign-in hands back to the app. */
+export interface GoogleAuthResult {
+  provider: "google";
+  /** Google account `sub` claim (mocked until real OAuth exists). */
+  googleId: string;
+  name: string;
+  email: string;
+  /** Google verifies email ownership; phone still needs our own OTP. */
+  emailVerified: boolean;
+}
+
+export type OtpChannel = "phone" | "email";
+
+export interface OtpSendResult {
+  channel: OtpChannel;
+  sent: boolean;
+  /** Where the code went, for display (e.g. masked phone). */
+  destination: string;
+}
+
+export interface OtpVerifyResult {
+  channel: OtpChannel;
+  verified: boolean;
+  error?: string;
+}
+
+export type BillingCycle = "monthly" | "yearly";
+
+/** The plan choice made in the signup wizard. */
+export interface PlanSelection {
+  planId: "basic";
+  /** "pilot" = free 6-month pilot, no payment; "paid" = pay today. */
+  mode: "pilot" | "paid";
+  /** null while mode is "pilot". */
+  billingCycle: BillingCycle | null;
+  /** Amount due today. 0 for the pilot. */
+  amountPaisa: number;
+}
+
+export interface MockPaymentResult {
+  status: "success";
+  /** Mock stand-in for the Razorpay payment id. */
+  paymentId: string;
+  method: "card" | "upi";
+  amountPaisa: number;
+}
+
 // ---------- Rooms & Beds ----------
 
 /** Room type implies capacity: single=1, double=2, triple=3, quad=4; dorm is custom. */
