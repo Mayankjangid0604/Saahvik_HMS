@@ -17,6 +17,7 @@ import { ResidentsModule } from "./residents/residents.module";
 import { RoomsModule } from "./rooms/rooms.module";
 import { SettingsModule } from "./settings/settings.module";
 import { StaffModule } from "./staff/staff.module";
+import { HealthController } from "./health.controller";
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { StaffModule } from "./staff/staff.module";
     ReportsModule,
     FilesModule,
   ],
+  controllers: [HealthController],
   providers: [
     // Order matters: JWT auth first, then role checks.
     { provide: APP_GUARD, useClass: JwtAuthGuard },

@@ -11,14 +11,21 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix("api/v1");
 
-  // Explicit origin list — never origin: '*' or origin: true, which would let
-  // any website make authenticated calls with a logged-in user's token.
-  const origins = (process.env.CORS_ORIGINS ??
-    "https://app.saahvik.com,http://localhost:5173,http://localhost:4200")
+  // Explicit allow-list from CORS_ORIGINS (never *); see HANDOFF.md.
+  const corsOrigins = (
+    process.env.CORS_ORIGINS ??
+    "https://app.saahvik.com,http://localhost:5173,http://localhost:4200"
+  )
     .split(",")
-    .map((o) => o.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
-  app.enableCors({ origin: origins, credentials: true });
+
+  app.enableCors({
+    origin: corsOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
