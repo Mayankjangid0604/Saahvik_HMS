@@ -1,0 +1,9 @@
+# Secrets — never commit key material
+*.pem
+*.key
+BEGIN PRIVATE KEY.txt
+BEGIN CERTIFICATE.txt
+
+# Build artifacts
+backend.tar.gz
+*.tar.gz
