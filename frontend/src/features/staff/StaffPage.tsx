@@ -48,7 +48,13 @@ export function StaffPage() {
     mutationFn: addStaff,
     onSuccess: (member) => {
       queryClient.invalidateQueries({ queryKey: ["staff"] });
-      toast({ title: `${member.name} added`, description: "They can now sign in with their email.", variant: "success" });
+      toast({
+        title: `${member.name} added`,
+        description: member.tempPassword
+          ? `Temporary password: ${member.tempPassword} — share it now, it won't be shown again.`
+          : "They can now sign in with their email.",
+        variant: "success",
+      });
       reset();
       setAddOpen(false);
     },

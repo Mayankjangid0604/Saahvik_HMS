@@ -1,4 +1,4 @@
-/** Mock auth API. Swap internals for apiClient calls when the backend lands. */
+/** Auth API backed by the real backend (see backend/HANDOFF.md). */
 import type {
   AuthSession,
   LoginRequest,
@@ -6,104 +6,95 @@ import type {
   SignupRequest,
   User,
 } from "./types";
-import { delay, org, owner } from "./mock/db";
+import { apiClient, TOKEN_KEY } from "./client";
 
-function makeToken(): string {
-  // Fake JWT: header.payload.signature (not a real signature, mock only)
-  const payload = btoa(JSON.stringify({ sub: owner.id, orgId: org.id, exp: Date.now() + 86400_000 }));
-  return `eyJhbGciOiJIUzI1NiJ9.${payload}.mock-signature`;
-}
-
-let pendingTwoFactorEmail: string | null = null;
+/**
+ * Challenge id handed out by POST /auth/login when 2FA is on; the verify
+ * step must echo it back. Kept in sessionStorage so a reload on the 2FA
+ * page doesn't strand the user.
+ */
+const TEMP_SESSION_KEY = "saahvik.tempSessionId";
 
 export async function login(input: LoginRequest): Promise<LoginResponse> {
-  await delay(500);
-  if (input.password === "wrongpass") {
-    throw new Error("Incorrect email or password");
+  const { data } = await apiClient.post<LoginResponse>("/auth/login", input);
+  if (data.requiresTwoFactor && data.tempSessionId) {
+    sessionStorage.setItem(TEMP_SESSION_KEY, data.tempSessionId);
+  } else {
+    sessionStorage.removeItem(TEMP_SESSION_KEY);
   }
-  // Emails containing "+2fa" simulate an account with 2FA enabled
-  if (input.email.includes("+2fa")) {
-    pendingTwoFactorEmail = input.email;
-    return { requiresTwoFactor: true };
-  }
-  return {
-    requiresTwoFactor: false,
-    token: makeToken(),
-    user: { ...owner, email: input.email || owner.email },
-    org,
-  };
+  return data;
 }
 
 export async function verifyTwoFactor(code: string): Promise<AuthSession> {
-  await delay(400);
-  if (!/^\d{6}$/.test(code)) {
-    throw new Error("Enter the 6-digit code from your authenticator app");
+  const tempSessionId = sessionStorage.getItem(TEMP_SESSION_KEY);
+  if (!tempSessionId) {
+    throw new Error("Your login session expired — please sign in again");
   }
-  const email = pendingTwoFactorEmail ?? owner.email;
-  pendingTwoFactorEmail = null;
-  return { token: makeToken(), user: { ...owner, email, twoFactorEnabled: true }, org };
+  const { data } = await apiClient.post<AuthSession>("/auth/2fa/verify", {
+    tempSessionId,
+    token: code,
+  });
+  sessionStorage.removeItem(TEMP_SESSION_KEY);
+  return data;
 }
 
 export async function signup(input: SignupRequest): Promise<AuthSession> {
-  await delay(600);
-  const user: User = {
-    ...owner,
-    name: input.name,
-    email: input.email,
-    phone: input.phone,
-    createdAt: new Date().toISOString(),
-  };
-  return {
-    token: makeToken(),
-    user,
-    org: { ...org, hostelName: input.hostelName, setupComplete: false },
-  };
+  const { data } = await apiClient.post<AuthSession>("/auth/signup", input);
+  return data;
 }
 
 export async function forgotPassword(email: string): Promise<{ sent: boolean }> {
-  await delay(500);
-  void email;
-  return { sent: true };
+  const { data } = await apiClient.post<{ sent: boolean }>("/auth/forgot-password", { email });
+  return data;
 }
 
 export async function changePassword(input: {
   currentPassword: string;
   newPassword: string;
 }): Promise<{ ok: boolean }> {
-  await delay(500);
-  if (input.currentPassword === "wrongpass") {
-    throw new Error("Current password is incorrect");
+  const { data } = await apiClient.post<{ ok: boolean; token?: string }>(
+    "/auth/change-password",
+    input,
+  );
+  // Password change bumps tokenVersion server-side; the old JWT is revoked
+  // and the response carries a fresh one — swap it in or the next request 401s.
+  if (data.token) {
+    localStorage.setItem(TOKEN_KEY, data.token);
   }
-  return { ok: true };
+  return data;
 }
 
-export async function setupTwoFactor(): Promise<{ secret: string; otpauthUrl: string }> {
-  await delay(400);
-  const secret = "JBSWY3DPEHPK3PXP";
-  return {
-    secret,
-    otpauthUrl: `otpauth://totp/Saahvik:${owner.email}?secret=${secret}&issuer=Saahvik`,
-  };
+export async function setupTwoFactor(): Promise<{
+  secret: string;
+  otpauthUrl: string;
+  qrCodeDataUrl?: string;
+}> {
+  const { data } = await apiClient.get<{
+    secret: string;
+    otpauthUrl: string;
+    qrCodeDataUrl?: string;
+  }>("/auth/2fa/setup");
+  return data;
 }
 
-export async function confirmTwoFactor(code: string): Promise<{ enabled: boolean }> {
-  await delay(400);
-  if (!/^\d{6}$/.test(code)) {
-    throw new Error("Enter the 6-digit code from your authenticator app");
-  }
-  owner.twoFactorEnabled = true;
-  return { enabled: true };
+export async function confirmTwoFactor(
+  code: string,
+): Promise<{ enabled: boolean; backupCodes?: string[] }> {
+  const { data } = await apiClient.post<{ enabled: boolean; backupCodes?: string[] }>(
+    "/auth/2fa/verify-setup",
+    { token: code },
+  );
+  return data;
 }
 
-export async function disableTwoFactor(): Promise<{ enabled: boolean }> {
-  await delay(300);
-  owner.twoFactorEnabled = false;
-  return { enabled: false };
+export async function disableTwoFactor(code: string): Promise<{ enabled: boolean }> {
+  const { data } = await apiClient.post<{ enabled: boolean }>("/auth/2fa/disable", {
+    token: code,
+  });
+  return data;
 }
 
 export async function updateProfile(input: { name: string; phone: string }): Promise<User> {
-  await delay(400);
-  owner.name = input.name;
-  owner.phone = input.phone;
-  return { ...owner };
+  const { data } = await apiClient.put<User>("/auth/profile", input);
+  return data;
 }

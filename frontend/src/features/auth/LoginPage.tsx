@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -20,11 +21,18 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export function LoginPage() {
-  const { login } = useAuth();
+  const { login, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
+
+  // Showing the login form means starting a fresh session: drop any stored
+  // token so a stale one can't bypass the credentials being entered.
+  useEffect(() => {
+    if (isAuthenticated) logout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     register,
@@ -46,8 +54,13 @@ export function LoginPage() {
   });
 
   return (
-    <AuthLayout title="Sign in" subtitle="Any email and password works in this demo build.">
+    <AuthLayout title="Sign in" subtitle="Welcome back — sign in to manage your hostel.">
       <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-3">
+        {mutation.isError && (
+          <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {(mutation.error as Error).message}
+          </p>
+        )}
         <FormField label="Email" error={errors.email?.message} required>
           <Input
             type="email"

@@ -57,6 +57,8 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   requiresTwoFactor: boolean;
+  /** Present when requiresTwoFactor is true — echo back on /auth/2fa/verify */
+  tempSessionId?: string;
   /** Present when requiresTwoFactor is false */
   token?: string;
   user?: User;
@@ -469,6 +471,8 @@ export interface StaffMember {
   role: UserRole;
   addedAt: string;
   lastActiveAt?: string;
+  /** One-time password returned ONLY by POST /staff — never retrievable again. */
+  tempPassword?: string;
 }
 
 export interface StaffList {

@@ -37,11 +37,14 @@ export function TwoFactorSetupPage() {
   });
 
   const disableMutation = useMutation({
-    mutationFn: disableTwoFactor,
+    mutationFn: (disableCode: string) => disableTwoFactor(disableCode),
     onSuccess: () => {
       if (user) updateUser({ ...user, twoFactorEnabled: false });
       toast({ title: "Two-factor disabled", variant: "info" });
+      setCode("");
     },
+    onError: (err: Error) =>
+      toast({ title: "Could not disable 2FA", description: err.message, variant: "error" }),
   });
 
   const copySecret = () => {
@@ -70,15 +73,28 @@ export function TwoFactorSetupPage() {
               Signing in requires a 6-digit code from your authenticator app in addition to your
               password.
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4"
-              onClick={() => disableMutation.mutate()}
-              isLoading={disableMutation.isPending}
-            >
-              <ShieldOff className="h-3.5 w-3.5" /> Disable 2FA
-            </Button>
+            <div className="mt-4 w-full max-w-xs space-y-3 text-left">
+              <FormField label="Enter a code from your app to disable" required>
+                <Input
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="123456"
+                  className="text-center font-mono text-lg tracking-[0.5em]"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                />
+              </FormField>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => disableMutation.mutate(code)}
+                isLoading={disableMutation.isPending}
+                disabled={code.length !== 6}
+              >
+                <ShieldOff className="h-3.5 w-3.5" /> Disable 2FA
+              </Button>
+            </div>
           </CardBody>
         </Card>
       ) : (

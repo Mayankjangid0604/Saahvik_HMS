@@ -1,6 +1,6 @@
-/** Mock notifications API. */
+/** Notifications API backed by the real backend. */
 import type { AppNotification, ListParams, Paginated } from "./types";
-import { delay, notifications, paginate } from "./mock/db";
+import { apiClient } from "./client";
 
 export interface NotificationListParams extends ListParams {
   onlyUnread?: boolean;
@@ -9,28 +9,27 @@ export interface NotificationListParams extends ListParams {
 export async function listNotifications(
   params: NotificationListParams = {},
 ): Promise<Paginated<AppNotification>> {
-  await delay();
-  let list = [...notifications].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  if (params.onlyUnread) list = list.filter((n) => !n.read);
-  return paginate(list, params.page, params.pageSize ?? 20);
+  const { data } = await apiClient.get<Paginated<AppNotification>>("/notifications", {
+    params: {
+      page: params.page,
+      pageSize: params.pageSize ?? 20,
+      onlyUnread: params.onlyUnread || undefined,
+    },
+  });
+  return data;
 }
 
 export async function getUnreadCount(): Promise<number> {
-  await delay(150);
-  return notifications.filter((n) => !n.read).length;
+  const { data } = await apiClient.get<number>("/notifications/unread-count");
+  return data;
 }
 
 export async function markNotificationRead(id: string): Promise<{ ok: boolean }> {
-  await delay(200);
-  const n = notifications.find((x) => x.id === id);
-  if (n) n.read = true;
-  return { ok: true };
+  const { data } = await apiClient.put<{ ok: boolean }>(`/notifications/${id}/read`);
+  return data;
 }
 
 export async function markAllNotificationsRead(): Promise<{ ok: boolean }> {
-  await delay(300);
-  notifications.forEach((n) => {
-    n.read = true;
-  });
-  return { ok: true };
+  const { data } = await apiClient.put<{ ok: boolean }>("/notifications/mark-all-read");
+  return data;
 }
