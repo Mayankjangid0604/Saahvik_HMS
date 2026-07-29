@@ -12,5 +12,14 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Same-origin path for the API so any dev port works without needing to
+    // be in the backend's CORS_ORIGINS. Used when VITE_API_URL=/api/v1;
+    // the default absolute http://localhost:3000 URL keeps working as before.
+    proxy: {
+      "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
+    },
   },
 });
