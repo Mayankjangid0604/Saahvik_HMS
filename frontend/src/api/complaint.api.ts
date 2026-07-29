@@ -1,4 +1,4 @@
-/** Mock complaints API. */
+/** Complaints API backed by the real backend. */
 import type {
   Complaint,
   ComplaintListParams,
@@ -6,63 +6,21 @@ import type {
   CreateComplaintInput,
   Paginated,
 } from "./types";
-import { complaints, delay, nextId, nextTicketNo, paginate, residents, sortBy } from "./mock/db";
+import { apiClient } from "./client";
 
 export async function listComplaints(params: ComplaintListParams = {}): Promise<Paginated<Complaint>> {
-  await delay();
-  let list = [...complaints];
-  if (params.search) {
-    const q = params.search.toLowerCase();
-    list = list.filter(
-      (c) =>
-        c.title.toLowerCase().includes(q) ||
-        c.ticketNo.toLowerCase().includes(q) ||
-        c.residentName?.toLowerCase().includes(q),
-    );
-  }
-  if (params.status && params.status !== "all") list = list.filter((c) => c.status === params.status);
-  if (params.category && params.category !== "all")
-    list = list.filter((c) => c.category === params.category);
-  list = sortBy(list, params.sortBy ?? "createdAt", params.sortDir ?? "desc");
-  return paginate(list, params.page, params.pageSize);
+  const { data } = await apiClient.get<Paginated<Complaint>>("/complaints", { params });
+  return data;
 }
 
 export async function getComplaint(id: string): Promise<Complaint> {
-  await delay(300);
-  const c = complaints.find((x) => x.id === id);
-  if (!c) throw new Error("Complaint not found");
-  return { ...c, timeline: [...c.timeline] };
+  const { data } = await apiClient.get<Complaint>(`/complaints/${id}`);
+  return data;
 }
 
 export async function createComplaint(input: CreateComplaintInput): Promise<Complaint> {
-  await delay(600);
-  const r = input.residentId ? residents.find((x) => x.id === input.residentId) : undefined;
-  const nowIso = new Date().toISOString();
-  const complaint: Complaint = {
-    id: nextId("cmp"),
-    ticketNo: nextTicketNo(),
-    title: input.title,
-    description: input.description,
-    category: input.category,
-    priority: input.priority,
-    status: "open",
-    residentId: r?.id,
-    residentName: r?.name,
-    roomNumber: r?.roomNumber,
-    createdAt: nowIso,
-    updatedAt: nowIso,
-    timeline: [
-      { id: nextId("ce"), status: "open", note: "Complaint registered", byName: "Mayank Jangid", at: nowIso },
-    ],
-    attachments: (input.attachments ?? []).map((a) => ({
-      id: nextId("att"),
-      fileName: a.fileName,
-      fileType: a.fileType,
-      url: "",
-    })),
-  };
-  complaints.unshift(complaint);
-  return complaint;
+  const { data } = await apiClient.post<Complaint>("/complaints", input);
+  return data;
 }
 
 export async function updateComplaintStatus(
@@ -70,12 +28,6 @@ export async function updateComplaintStatus(
   status: ComplaintStatus,
   note?: string,
 ): Promise<Complaint> {
-  await delay(500);
-  const c = complaints.find((x) => x.id === id);
-  if (!c) throw new Error("Complaint not found");
-  const nowIso = new Date().toISOString();
-  c.status = status;
-  c.updatedAt = nowIso;
-  c.timeline.push({ id: nextId("ce"), status, note, byName: "Mayank Jangid", at: nowIso });
-  return { ...c, timeline: [...c.timeline] };
+  const { data } = await apiClient.put<Complaint>(`/complaints/${id}`, { status, note });
+  return data;
 }
