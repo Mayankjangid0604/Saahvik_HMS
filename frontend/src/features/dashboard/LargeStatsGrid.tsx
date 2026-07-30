@@ -44,7 +44,8 @@ function BigCard({
 /** Row 1 — four equal-height cards: Occupancy, Dues, Total Collection, Profit. */
 export function LargeStatsGrid({ data }: { data: DashboardData }) {
   const { occupancy, dues, collection, netProfitPaisa } = data ?? {};
-  const showProperties = (occupancy?.byProperty?.length ?? 0) > 1;
+  const byProperty = occupancy?.byProperty ?? [];
+  const showProperties = byProperty.length > 1;
   // Profit reveals expenses — hidden for staff without manageExpenses.
   const showProfit = Boolean(data?.expensesVisible) && netProfitPaisa != null;
   const profitPositive = (netProfitPaisa ?? 0) >= 0;
@@ -59,7 +60,7 @@ export function LargeStatsGrid({ data }: { data: DashboardData }) {
         </p>
         {showProperties && (
           <ul className="mt-3 space-y-1.5 border-t border-slate-100 pt-3">
-            {occupancy?.byProperty?.map((p) => (
+            {byProperty.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-2 text-xs">
                 <span className="truncate text-ink">{p.name}</span>
                 <span className="shrink-0 font-mono tabular-nums text-muted">
