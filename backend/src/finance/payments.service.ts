@@ -100,8 +100,31 @@ export class PaymentsService {
 
       // Rent payments net against current dues; any overpayment becomes prepaid
       // advance balance instead of silently vanishing when dues clamp to 0.
-      const appliedToDues = dto.type === "rent" ? Math.min(dto.amountPaisa, resident.duesPaisa) : 0;
-      const advanceApplied = dto.type === "rent" ? dto.amountPaisa - appliedToDues : 0;
+      let appliedToDues = 0;
+      let advanceApplied = 0;
+      let lockedDues = 0;
+      let lockedAdvance = 0;
+      if (dto.type === "rent") {
+        // Read dues/advance INSIDE the transaction and lock the resident row with
+        // SELECT ... FOR UPDATE — the identical pattern SequenceService.next()
+        // uses. Two rent payments for the same resident recorded concurrently
+        // otherwise both compute their Math.min(amount, dues) split from the same
+        // stale pre-transaction snapshot and the second absolute write clobbers
+        // the first (lost update). Serializing on the row lock makes the second
+        // payment block until the first commits, then read the fresh value.
+        // increment/decrement alone would NOT fix this: the split calculation
+        // itself needs a consistent, locked duesPaisa to read.
+        const [locked] = await tx.$queryRaw<
+          Array<{ duesPaisa: number; advanceBalancePaisa: number }>
+        >`
+          SELECT "duesPaisa", "advanceBalancePaisa" FROM "Resident"
+          WHERE "id" = ${resident.id} AND "orgId" = ${user.orgId}
+          FOR UPDATE`;
+        lockedDues = locked.duesPaisa;
+        lockedAdvance = locked.advanceBalancePaisa;
+        appliedToDues = Math.min(dto.amountPaisa, lockedDues);
+        advanceApplied = dto.amountPaisa - appliedToDues;
+      }
 
       const payment = await tx.payment.create({
         data: {
@@ -124,10 +147,13 @@ export class PaymentsService {
         await tx.resident.update({
           where: { id: resident.id },
           data: {
-            // resident.duesPaisa - appliedToDues == Math.max(0, dues - amount):
-            // same clamp-at-zero behavior, but the excess is now recorded below.
-            duesPaisa: resident.duesPaisa - appliedToDues,
-            advanceBalancePaisa: resident.advanceBalancePaisa + advanceApplied,
+            // lockedDues - appliedToDues == Math.max(0, dues - amount): same
+            // clamp-at-zero behavior, but the excess is now recorded below.
+            // Sourced from the locked read (not the stale outer `resident`) so
+            // the absolute write is safe under concurrency — see the FOR UPDATE
+            // above.
+            duesPaisa: lockedDues - appliedToDues,
+            advanceBalancePaisa: lockedAdvance + advanceApplied,
           },
         });
       }
@@ -189,6 +215,57 @@ export class PaymentsService {
         },
         include: PAYMENT_INCLUDE,
       });
+
+      // Reverse this payment's effect on the resident's dues/advance. Only rent
+      // payments ever touched those fields in record(), so only rent refunds
+      // unwind them — deposit/fine/other refunds behave exactly as before.
+      if (p.type === "rent") {
+        // Lock the resident row (same SELECT ... FOR UPDATE pattern as record()
+        // and SequenceService) so this read-then-absolute-write can't race a
+        // concurrent payment or refund on the same resident.
+        const [locked] = await tx.$queryRaw<
+          Array<{ duesPaisa: number; advanceBalancePaisa: number }>
+        >`
+          SELECT "duesPaisa", "advanceBalancePaisa" FROM "Resident"
+          WHERE "id" = ${p.residentId} AND "orgId" = ${user.orgId}
+          FOR UPDATE`;
+
+        // Advance-first reversal. When this payment was recorded it split into
+        // `advanceAppliedPaisa` (the overpayment that became advance) and
+        // `amountPaisa - advanceAppliedPaisa` (what paid down dues). A refund is
+        // the "extra" money going back, so we unwind the advance portion before
+        // the dues portion — this matches the canonical case (a pure overpayment
+        // refunded in full drops advance to 0 and leaves dues untouched).
+        //
+        // Computed cumulatively over the running refunded total so repeated
+        // partial refunds stay consistent regardless of how they're chunked:
+        // advance is reversed across the first `A` paisa refunded, dues across
+        // the remaining `D`. reverseAdvance + reverseDues === dto.amountPaisa.
+        const advancePortion = p.advanceAppliedPaisa; // A
+        const reverseAdvance =
+          Math.min(refundedPaisa, advancePortion) -
+          Math.min(p.refundedPaisa, advancePortion);
+        const reverseDues = dto.amountPaisa - reverseAdvance;
+
+        // No clamp needed at either end, and none is added (avoiding dead code):
+        //  - advanceBalancePaisa can't go negative — nothing draws advance down
+        //    today (dues accrual on increase has no call site; advance is only
+        //    ever added by overpayment and read-netted), so the advance this
+        //    payment created is still fully present to reverse.
+        //  - duesPaisa restoration is bounded by this payment's original dues
+        //    portion (a full refund restores exactly amountPaisa -
+        //    advanceAppliedPaisa, never more) — the sensible cap.
+        if (reverseAdvance !== 0 || reverseDues !== 0) {
+          await tx.resident.update({
+            where: { id: p.residentId },
+            data: {
+              duesPaisa: locked.duesPaisa + reverseDues,
+              advanceBalancePaisa: locked.advanceBalancePaisa - reverseAdvance,
+            },
+          });
+        }
+      }
+
       await this.audit.log(
         user,
         {

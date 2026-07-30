@@ -92,14 +92,27 @@ export class ResidentsService {
     const { page, pageSize, skip, take } = pageArgs(params, 10);
     const sortField = params.sortBy ?? "name";
     const dir = params.sortDir ?? "asc";
+
+    // "duesPaisa" is the netted effectiveDues(dues, advance) value shown to the
+    // user, not the raw column — a resident whose advance fully covers dues shows
+    // ₹0 yet would rank high in a raw-column sort. Prisma can't ORDER BY a
+    // computed expression, so for this field we fetch all matching rows, sort the
+    // mapped (netted) DTOs in JS, then slice for pagination. Resident counts are
+    // capped small per org (≤500), so fetch-all-then-slice is cheap — the same
+    // pattern PaymentsService.buildDues/listDues already uses.
+    if (sortField === "duesPaisa") {
+      const rows = await this.prisma.resident.findMany({ where, include: RESIDENT_INCLUDE });
+      const mapped = rows.map(toResidentDto);
+      mapped.sort((a, b) => (dir === "asc" ? a.duesPaisa - b.duesPaisa : b.duesPaisa - a.duesPaisa));
+      return paginated(mapped.slice(skip, skip + take), mapped.length, page, pageSize);
+    }
+
     const orderBy: Prisma.ResidentOrderByWithRelationInput =
       sortField === "joinDate"
         ? { joinDate: dir }
-        : sortField === "duesPaisa"
-          ? { duesPaisa: dir }
-          : sortField === "monthlyFeePaisa"
-            ? { monthlyFeePaisa: dir }
-            : { name: dir };
+        : sortField === "monthlyFeePaisa"
+          ? { monthlyFeePaisa: dir }
+          : { name: dir };
 
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.resident.findMany({ where, include: RESIDENT_INCLUDE, orderBy, skip, take }),
