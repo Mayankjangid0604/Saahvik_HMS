@@ -8,8 +8,9 @@ import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 /** Recent Payments — inbound and outbound (refunds shown in red/negative). */
-export function RecentPayments({ payments }: { payments: Payment[] }) {
+export function RecentPayments({ payments = [] }: { payments?: Payment[] }) {
   const navigate = useNavigate();
+  const list = payments ?? [];
   return (
     <Card>
       <CardHeader
@@ -20,12 +21,12 @@ export function RecentPayments({ payments }: { payments: Payment[] }) {
           </Link>
         }
       />
-      {payments.length === 0 ? (
+      {list.length === 0 ? (
         <p className="px-4 py-6 text-center text-xs text-muted">No payments yet</p>
       ) : (
         <ul>
-          {payments.map((p) => {
-            const refunded = p.refundedPaisa > 0 || p.status !== "completed";
+          {list.map((p) => {
+            const refunded = (p.refundedPaisa ?? 0) > 0 || p.status !== "completed";
             return (
               <li
                 key={p.id}
@@ -42,15 +43,15 @@ export function RecentPayments({ payments }: { payments: Payment[] }) {
                     )}
                   </p>
                   <p className="text-[11px] text-muted">
-                    {p.roomNumber ?? "—"} · {p.method.replace("_", " ")} · {timeAgo(p.paidAt)}
+                    {p.roomNumber ?? "—"} · {(p.method ?? "").replace("_", " ")} · {timeAgo(p.paidAt)}
                   </p>
                 </div>
                 {refunded ? (
                   <span className="font-mono text-sm font-medium text-red-600 tabular-nums">
-                    −<MoneyDisplay paisa={p.refundedPaisa || p.amountPaisa} className="text-red-600" />
+                    −<MoneyDisplay paisa={p.refundedPaisa || p.amountPaisa || 0} className="text-red-600" />
                   </span>
                 ) : (
-                  <MoneyDisplay paisa={p.amountPaisa} className="text-sm font-medium text-ink" />
+                  <MoneyDisplay paisa={p.amountPaisa ?? 0} className="text-sm font-medium text-ink" />
                 )}
               </li>
             );
@@ -62,8 +63,9 @@ export function RecentPayments({ payments }: { payments: Payment[] }) {
 }
 
 /** Recent Complaints — reuses StatusBadge, matching the ComplaintsPage pattern. */
-export function RecentComplaints({ complaints }: { complaints: Complaint[] }) {
+export function RecentComplaints({ complaints = [] }: { complaints?: Complaint[] }) {
   const navigate = useNavigate();
+  const list = complaints ?? [];
   return (
     <Card>
       <CardHeader
@@ -74,11 +76,11 @@ export function RecentComplaints({ complaints }: { complaints: Complaint[] }) {
           </Link>
         }
       />
-      {complaints.length === 0 ? (
+      {list.length === 0 ? (
         <p className="px-4 py-6 text-center text-xs text-muted">No open complaints 🎉</p>
       ) : (
         <ul>
-          {complaints.map((c) => (
+          {list.map((c) => (
             <li
               key={c.id}
               className={cn(

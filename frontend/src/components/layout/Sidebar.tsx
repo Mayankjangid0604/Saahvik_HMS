@@ -14,12 +14,12 @@ export function SidebarContent({
 }) {
   const { org, user } = useAuth();
   // Hide permission-gated items from staff who lack them (owners see everything).
-  const groups = navGroups
+  const groups = (navGroups ?? [])
     .map((g) => ({
       ...g,
-      items: g.items.filter((i) => !i.requires || hasPermission(user, i.requires)),
+      items: (g.items ?? []).filter((i) => !i.requires || hasPermission(user, i.requires)),
     }))
-    .filter((g) => g.items.length > 0);
+    .filter((g) => (g.items?.length ?? 0) > 0);
   return (
     <div className="flex h-full flex-col bg-primary text-slate-300">
       <div

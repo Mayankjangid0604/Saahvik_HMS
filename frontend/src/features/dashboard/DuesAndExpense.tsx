@@ -11,7 +11,8 @@ function daysOverdue(iso: string): number {
 }
 
 /** Due residents, longest overdue first (order comes from the API). */
-export function DueResidentsList({ dues }: { dues: DueEntry[] }) {
+export function DueResidentsList({ dues = [] }: { dues?: DueEntry[] }) {
+  const list = dues ?? [];
   return (
     <Card>
       <CardHeader
@@ -23,11 +24,11 @@ export function DueResidentsList({ dues }: { dues: DueEntry[] }) {
           </Link>
         }
       />
-      {dues.length === 0 ? (
+      {list.length === 0 ? (
         <p className="px-4 py-6 text-center text-xs text-muted">No dues outstanding 🎉</p>
       ) : (
         <ul>
-          {dues.map((d) => (
+          {list.map((d) => (
             <li
               key={d.residentId}
               className="flex h-12 items-center justify-between gap-2 border-b border-slate-100 px-4 last:border-0"
@@ -40,7 +41,7 @@ export function DueResidentsList({ dues }: { dues: DueEntry[] }) {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <StatusBadge status={d.severity} />
-                <MoneyDisplay paisa={d.duesPaisa} className="text-sm font-medium text-red-600" />
+                <MoneyDisplay paisa={d.duesPaisa ?? 0} className="text-sm font-medium text-red-600" />
               </div>
             </li>
           ))}
