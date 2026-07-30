@@ -1,8 +1,9 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createRoom } from "@/api/hostel.api";
+import { listWings } from "@/api/wing.api";
 import type { RoomType } from "@/api/types";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -35,6 +36,7 @@ const schema = z
     floor: z.coerce.number().int().min(0, "Floor is required"),
     type: z.enum(["single", "double", "triple", "quad", "dorm"]),
     dormBeds: z.coerce.number().optional(),
+    wingId: z.string().optional(),
     fixedFee: z.boolean(),
     feeRupees: z.coerce.number().optional(),
   })
@@ -66,11 +68,12 @@ export function AddRoomDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
     formState: { errors },
   } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { type: "double", floor: 1, fixedFee: false, dormBeds: 4 },
+    defaultValues: { type: "double", floor: 1, fixedFee: false, dormBeds: 4, wingId: "" },
   });
 
   const type = watch("type") as RoomType;
   const fixedFee = !!watch("fixedFee");
+  const { data: wings = [] } = useQuery({ queryKey: ["wings"], queryFn: listWings });
 
   const mutation = useMutation({
     mutationFn: (v: FormValues) =>
@@ -81,6 +84,7 @@ export function AddRoomDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
         capacity: roomCapacityFor(v.type, v.dormBeds),
         feeMode: v.fixedFee ? "fixed" : "variable",
         fixedFeeAmountPaisa: v.fixedFee ? rupeesToPaisa(v.feeRupees ?? 0) : null,
+        wingId: v.wingId || undefined,
       }),
     onSuccess: (room) => {
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
@@ -117,6 +121,20 @@ export function AddRoomDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
             </FormField>
           )}
         </div>
+
+        <FormField
+          label="Wing"
+          hint={wings.length === 0 ? "Optional — create wings in Settings › Wings" : "Optional"}
+        >
+          <Select {...register("wingId")}>
+            <option value="">No wing</option>
+            {wings.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </Select>
+        </FormField>
 
         <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-slate-200 px-3 py-2.5">
           <input

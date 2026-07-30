@@ -32,6 +32,8 @@ export interface User {
   phone: string;
   role: UserRole;
   twoFactorEnabled: boolean;
+  /** Fine-grained capabilities. Owners hold every StaffPermission; staff hold a subset. */
+  permissions?: StaffPermission[];
   createdAt: string;
 }
 
@@ -162,6 +164,9 @@ export interface Room {
   feeMode: RoomFeeMode;
   /** Set when feeMode is "fixed"; null otherwise */
   fixedFeeAmountPaisa: number | null;
+  /** Optional wing this room belongs to. */
+  wingId?: string;
+  wingName?: string;
   beds: Bed[];
   occupiedCount: number;
   notes?: string;
@@ -174,6 +179,7 @@ export interface CreateRoomInput {
   capacity: number;
   feeMode: RoomFeeMode;
   fixedFeeAmountPaisa: number | null;
+  wingId?: string;
   notes?: string;
 }
 
@@ -185,6 +191,29 @@ export interface BulkAddRoomsInput {
   capacity: number;
   feeMode: RoomFeeMode;
   fixedFeeAmountPaisa: number | null;
+  wingId?: string;
+}
+
+// ---------- Wings ----------
+
+export interface Wing {
+  id: string;
+  hostelId: string;
+  name: string;
+  notes?: string;
+  roomCount: number;
+  createdAt: string;
+}
+
+export interface CreateWingInput {
+  name: string;
+  hostelId?: string;
+  notes?: string;
+}
+
+export interface UpdateWingInput {
+  name?: string;
+  notes?: string;
 }
 
 export interface UpdateRoomFeeInput {
@@ -227,7 +256,10 @@ export interface Resident {
   institutionOrCompany?: string;
   monthlyFeePaisa: number;
   depositPaisa: number;
+  /** Dues NET of advance balance (a fully-covered resident reads 0). */
   duesPaisa: number;
+  /** Prepaid rent credit from overpayments; nets against dues on read. */
+  advanceBalancePaisa: number;
   notes?: string;
   /** Answers to the configurable admission form, keyed by field key. */
   admissionData?: Record<string, string>;
@@ -238,7 +270,10 @@ export interface ResidentListParams extends ListParams {
   roomId?: string;
 }
 
-export type CreateResidentInput = Omit<Resident, "id" | "duesPaisa" | "status" | "roomNumber" | "bedLabel"> & {
+export type CreateResidentInput = Omit<
+  Resident,
+  "id" | "duesPaisa" | "advanceBalancePaisa" | "status" | "roomNumber" | "bedLabel"
+> & {
   status?: ResidentStatus;
 };
 
@@ -492,27 +527,158 @@ export interface CreateDiscountInput {
   validTill?: string;
 }
 
+// ---------- Expenses ----------
+
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  active: boolean;
+  sortOrder: number;
+  expenseCount: number;
+  createdAt: string;
+}
+
+export interface Expense {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  label: string;
+  amountPaisa: number;
+  method: PaymentMethod;
+  spentAt: string;
+  notes?: string;
+  /** Relative authenticated file path when an attachment exists. */
+  attachmentUrl?: string;
+  recordedByName: string;
+  createdAt: string;
+}
+
+export interface ExpenseListParams extends ListParams {
+  categoryId?: string | "all";
+  method?: PaymentMethod | "all";
+  from?: string;
+  to?: string;
+}
+
+export interface CreateExpenseInput {
+  categoryId: string;
+  label: string;
+  amountPaisa: number;
+  method: PaymentMethod;
+  spentAt: string;
+  notes?: string;
+  attachmentKey?: string;
+}
+
+export interface CreateExpenseCategoryInput {
+  name: string;
+}
+
+export interface UpdateExpenseCategoryInput {
+  name?: string;
+  active?: boolean;
+}
+
 // ---------- Dashboard ----------
 
+export type DashboardRange =
+  | "today"
+  | "yesterday"
+  | "last7"
+  | "thisMonth"
+  | "lastMonth"
+  | "thisQuarter"
+  | "thisYear";
+
+export interface PropertyOccupancy {
+  id: string;
+  name: string;
+  occupiedBeds: number;
+  totalBeds: number;
+  occupancyPct: number;
+}
+
+/** Collection totals split by payment method (paisa). */
+export interface CollectionByMethod {
+  cash: number;
+  upi: number;
+  bank_transfer: number;
+  card: number;
+  cheque: number;
+}
+
+export interface ExpenseBreakdownItem {
+  categoryId: string;
+  label: string;
+  amountPaisa: number;
+  /** Share of the range's total expense, 0–100. */
+  pct: number;
+}
+
+export interface DashboardChartPoint {
+  label: string;
+  amountPaisa: number;
+}
+
 export interface DashboardData {
+  range: DashboardRange;
+  rangeLabel: string;
   occupancy: {
     totalBeds: number;
     occupiedBeds: number;
     vacantBeds: number;
     maintenanceBeds: number;
     occupancyPct: number;
+    /** One entry per hostel/property. Skip the list in the UI when length <= 1. */
+    byProperty: PropertyOccupancy[];
   };
   dues: DuesSummary;
-  thisMonth: {
-    collectedPaisa: number;
-    expectedPaisa: number;
+  /** Collection for the selected range, net of refunds. */
+  collection: {
+    totalPaisa: number;
+    byMethod: CollectionByMethod;
   };
+  /**
+   * Collection − expenses for the range. Present only when `expensesVisible`
+   * — omitted for staff without the manageExpenses permission.
+   */
+  netProfitPaisa?: number;
+  activeResidents: number;
+  /** Rent overpayment routed to advance during the range. */
+  advanceCollectedPaisa: number;
+  /** Live snapshot: total prepaid advance held across active residents. */
+  advanceBalanceTotalPaisa: number;
+  cashInflowPaisa: number;
+  complaints: { total: number; active: number; resolved: number };
+  /** Whether profit/expense figures are included (owner or manageExpenses). */
+  expensesVisible: boolean;
+  /** Present only when `expensesVisible`. */
+  expense?: {
+    totalPaisa: number;
+    breakdown: ExpenseBreakdownItem[];
+  };
+  /** Range-appropriate granularity (hour/day/month). */
+  collectionsChart: DashboardChartPoint[];
   recentPayments: Payment[];
   recentComplaints: Complaint[];
-  collectionsChart: { month: string; amountPaisa: number }[]; // last 6 months
+  /** Due residents, longest overdue first. */
+  dueResidents: DueEntry[];
+  /** Current calendar month, NEVER affected by the range filter. */
+  thisMonthFixed: {
+    collectionPaisa: number;
+    advancePaisa: number;
+    /** Present only when `expensesVisible`. */
+    netProfitPaisa?: number;
+  };
 }
 
 // ---------- Staff ----------
+
+/** Fine-grained staff capabilities (mirrors backend STAFF_PERMISSIONS). */
+export type StaffPermission = "manageExpenses";
+
+export type StaffRole = "manager" | "receptionist" | "maintenance";
+export type StaffStatus = "active" | "inactive";
 
 export interface StaffMember {
   id: string;
@@ -520,6 +686,11 @@ export interface StaffMember {
   email: string;
   phone: string;
   role: UserRole;
+  /** Present for staff (not owners). */
+  staffRole?: StaffRole;
+  status?: StaffStatus;
+  /** Capabilities granted to this member. Owners implicitly hold all. */
+  permissions?: StaffPermission[];
   addedAt: string;
   lastActiveAt?: string;
   /** One-time password returned ONLY by POST /staff — never retrievable again. */
@@ -536,6 +707,14 @@ export interface AddStaffInput {
   name: string;
   email: string;
   phone: string;
+  permissions?: StaffPermission[];
+}
+
+export interface UpdateStaffInput {
+  name?: string;
+  phone?: string;
+  status?: StaffStatus;
+  permissions?: StaffPermission[];
 }
 
 // ---------- Notifications ----------

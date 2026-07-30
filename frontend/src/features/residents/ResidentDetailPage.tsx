@@ -130,6 +130,15 @@ export function ResidentDetailPage() {
                 <p className="text-[11px] text-muted uppercase">Dues</p>
                 <MoneyDisplay paisa={resident.duesPaisa} className="text-sm font-medium" colorBySign />
               </div>
+              {resident.advanceBalancePaisa > 0 && (
+                <div>
+                  <p className="text-[11px] text-muted uppercase">Advance</p>
+                  <MoneyDisplay
+                    paisa={resident.advanceBalancePaisa}
+                    className="text-sm font-medium text-green-700"
+                  />
+                </div>
+              )}
               <div>
                 <p className="text-[11px] text-muted uppercase">Deposit</p>
                 <MoneyDisplay paisa={resident.depositPaisa} className="text-sm font-medium" />

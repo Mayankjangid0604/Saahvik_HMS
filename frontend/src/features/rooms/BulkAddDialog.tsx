@@ -1,8 +1,9 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { bulkAddRooms } from "@/api/hostel.api";
+import { listWings } from "@/api/wing.api";
 import type { RoomType } from "@/api/types";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -20,6 +21,7 @@ const schema = z
     count: z.coerce.number().int().min(1, "At least 1").max(50, "Max 50 at a time"),
     type: z.enum(["single", "double", "triple", "quad", "dorm"]),
     dormBeds: z.coerce.number().optional(),
+    wingId: z.string().optional(),
     fixedFee: z.boolean(),
     feeRupees: z.coerce.number().optional(),
   })
@@ -47,13 +49,22 @@ export function BulkAddDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
     formState: { errors },
   } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { floor: 4, startNumber: 401, count: 6, type: "double", dormBeds: 4, fixedFee: false },
+    defaultValues: {
+      floor: 4,
+      startNumber: 401,
+      count: 6,
+      type: "double",
+      dormBeds: 4,
+      fixedFee: false,
+      wingId: "",
+    },
   });
 
   const type = watch("type") as RoomType;
   const fixedFee = !!watch("fixedFee");
   const startNumber = Number(watch("startNumber"));
   const count = Number(watch("count"));
+  const { data: wings = [] } = useQuery({ queryKey: ["wings"], queryFn: listWings });
 
   const mutation = useMutation({
     mutationFn: (v: FormValues) =>
@@ -65,6 +76,7 @@ export function BulkAddDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
         capacity: roomCapacityFor(v.type, v.dormBeds),
         feeMode: v.fixedFee ? "fixed" : "variable",
         fixedFeeAmountPaisa: v.fixedFee ? rupeesToPaisa(v.feeRupees ?? 0) : null,
+        wingId: v.wingId || undefined,
       }),
     onSuccess: ({ created }) => {
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
@@ -107,6 +119,20 @@ export function BulkAddDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
             </FormField>
           )}
         </div>
+
+        <FormField
+          label="Wing"
+          hint={wings.length === 0 ? "Optional — create wings in Settings › Wings" : "Applies to every room created"}
+        >
+          <Select {...register("wingId")}>
+            <option value="">No wing</option>
+            {wings.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </Select>
+        </FormField>
 
         <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-slate-200 px-3 py-2.5">
           <input

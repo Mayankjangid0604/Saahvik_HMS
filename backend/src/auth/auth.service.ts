@@ -8,7 +8,7 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import type { Organization, Owner, Prisma, Staff } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { authenticator } from "otplib";
 import * as QRCode from "qrcode";
 import { AuditService } from "../audit/audit.service";
@@ -260,16 +260,16 @@ export class AuthService {
   async forgotPassword(email: string) {
     const owner = await this.prisma.owner.findUnique({ where: { email } });
     if (owner) {
-      const token = randomBytes(32).toString("hex");
+      const rawToken = randomBytes(32).toString("hex");
       await this.prisma.owner.update({
         where: { id: owner.id },
         data: {
-          passwordResetToken: token,
+          passwordResetToken: hashResetToken(rawToken),
           passwordResetExpiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
         },
       });
       const appUrl = process.env.APP_URL ?? "https://app.saahvik.com";
-      await this.email.sendPasswordReset(email, `${appUrl}/reset-password?token=${token}`);
+      await this.email.sendPasswordReset(email, `${appUrl}/reset-password?token=${rawToken}`);
     }
     // Same response whether or not the account exists — no email enumeration.
     return { sent: true };
@@ -277,7 +277,7 @@ export class AuthService {
 
   async resetPassword(token: string, newPassword: string) {
     const owner = await this.prisma.owner.findFirst({
-      where: { passwordResetToken: token, passwordResetExpiresAt: { gt: new Date() } },
+      where: { passwordResetToken: hashResetToken(token), passwordResetExpiresAt: { gt: new Date() } },
     });
     if (!owner) {
       throw new ApiError(
@@ -440,6 +440,11 @@ export class AuthService {
     if (!org) throw new UnauthorizedException();
     return org;
   }
+}
+
+/** Reset tokens are stored as their SHA-256 hash — never the raw value (DB read access must not grant account takeover). */
+function hashResetToken(rawToken: string): string {
+  return createHash("sha256").update(rawToken).digest("hex");
 }
 
 /** 8-char uppercase alphanumeric, unambiguous alphabet. */

@@ -3,6 +3,7 @@ import { PaymentMethod, PaymentType, Prisma } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { ApiError } from "../common/api-error";
 import type { AuthUser } from "../common/auth-user";
+import { effectiveDues } from "../common/dues";
 import { pageArgs, paginated, type Paginated } from "../common/pagination";
 import { SequenceService } from "../common/sequence.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -96,6 +97,12 @@ export class PaymentsService {
     const payment = await this.prisma.$transaction(async (tx) => {
       const year = paidAt.getFullYear();
       const seq = await this.sequence.next(tx, user.orgId, "receipt", year);
+
+      // Rent payments net against current dues; any overpayment becomes prepaid
+      // advance balance instead of silently vanishing when dues clamp to 0.
+      const appliedToDues = dto.type === "rent" ? Math.min(dto.amountPaisa, resident.duesPaisa) : 0;
+      const advanceApplied = dto.type === "rent" ? dto.amountPaisa - appliedToDues : 0;
+
       const payment = await tx.payment.create({
         data: {
           orgId: user.orgId,
@@ -108,6 +115,7 @@ export class PaymentsService {
           periodMonth: dto.periodMonth,
           notes: dto.notes,
           recordedByName: user.name,
+          advanceAppliedPaisa: advanceApplied,
         },
         include: PAYMENT_INCLUDE,
       });
@@ -115,7 +123,12 @@ export class PaymentsService {
       if (dto.type === "rent") {
         await tx.resident.update({
           where: { id: resident.id },
-          data: { duesPaisa: Math.max(0, resident.duesPaisa - dto.amountPaisa) },
+          data: {
+            // resident.duesPaisa - appliedToDues == Math.max(0, dues - amount):
+            // same clamp-at-zero behavior, but the excess is now recorded below.
+            duesPaisa: resident.duesPaisa - appliedToDues,
+            advanceBalancePaisa: resident.advanceBalancePaisa + advanceApplied,
+          },
         });
       }
 
@@ -236,9 +249,12 @@ export class PaymentsService {
     });
     return residents
       .map((r) => {
+        // Net dues against any prepaid advance — a resident fully covered by
+        // advance drops out of the list entirely (filtered below).
+        const netDues = effectiveDues(r.duesPaisa, r.advanceBalancePaisa);
         const months = Math.max(
           1,
-          Math.round(r.duesPaisa / Math.max(1, r.monthlyFeePaisa)),
+          Math.round(netDues / Math.max(1, r.monthlyFeePaisa)),
         );
         const oldest = new Date();
         oldest.setMonth(oldest.getMonth() - months);
@@ -248,12 +264,13 @@ export class PaymentsService {
           residentName: r.name,
           phone: r.phone,
           roomNumber: r.room?.number,
-          duesPaisa: r.duesPaisa,
+          duesPaisa: netDues,
           oldestDueDate: oldest.toISOString(),
           monthsOverdue: months,
           severity: months >= 3 ? ("high" as const) : months >= 2 ? ("medium" as const) : ("low" as const),
         };
       })
+      .filter((d) => d.duesPaisa > 0)
       .sort((a, b) => b.duesPaisa - a.duesPaisa);
   }
 

@@ -25,6 +25,7 @@ import { BulkImportPage } from "@/features/residents/BulkImportPage";
 import { AlumniPage } from "@/features/residents/AlumniPage";
 import { PaymentsPage } from "@/features/payments/PaymentsPage";
 import { PaymentDetailPage } from "@/features/payments/PaymentDetailPage";
+import { ExpensesPage } from "@/features/expenses/ExpensesPage";
 import { FeeStructuresPage } from "@/features/fees/FeeStructuresPage";
 import { FeeAssignmentPage } from "@/features/fees/FeeAssignmentPage";
 import { BulkFeeAssignPage } from "@/features/fees/BulkFeeAssignPage";
@@ -43,6 +44,8 @@ import { NotificationsPage } from "@/features/notifications/NotificationsPage";
 import { NotificationPreferencesPage } from "@/features/notifications/NotificationPreferencesPage";
 import { OrgSettingsPage } from "@/features/settings/OrgSettingsPage";
 import { AdmissionFormConfigPage } from "@/features/settings/AdmissionFormConfigPage";
+import { WingsPage } from "@/features/settings/WingsPage";
+import { ExpenseCategoriesPage } from "@/features/settings/ExpenseCategoriesPage";
 import { SubscriptionPage } from "@/features/settings/SubscriptionPage";
 import { DataExportPage } from "@/features/export/DataExportPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
@@ -79,6 +82,7 @@ const router = createBrowserRouter([
       { path: "residents/:id", element: <ResidentDetailPage /> },
       { path: "payments", element: <PaymentsPage /> },
       { path: "payments/:id", element: <PaymentDetailPage /> },
+      { path: "expenses", element: <ExpensesPage /> },
       { path: "fees", element: <FeeStructuresPage /> },
       { path: "fees/assign", element: <FeeAssignmentPage /> },
       { path: "fees/bulk-assign", element: <BulkFeeAssignPage /> },
@@ -96,6 +100,8 @@ const router = createBrowserRouter([
       { path: "notifications", element: <NotificationsPage /> },
       { path: "notifications/preferences", element: <NotificationPreferencesPage /> },
       { path: "settings", element: <OrgSettingsPage /> },
+      { path: "settings/wings", element: <WingsPage /> },
+      { path: "settings/expense-categories", element: <ExpenseCategoriesPage /> },
       { path: "settings/admission-form", element: <AdmissionFormConfigPage /> },
       { path: "settings/subscription", element: <SubscriptionPage /> },
       { path: "settings/export", element: <DataExportPage /> },

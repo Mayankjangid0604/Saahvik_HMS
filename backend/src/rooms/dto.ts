@@ -50,6 +50,10 @@ export class CreateRoomDto {
 
   @IsOptional()
   @IsString()
+  wingId?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 }
 
@@ -84,6 +88,10 @@ export class BulkAddRoomsDto {
   @IsInt()
   @Min(0)
   fixedFeeAmountPaisa!: number | null;
+
+  @IsOptional()
+  @IsString()
+  wingId?: string;
 }
 
 export class UpdateRoomFeeDto {

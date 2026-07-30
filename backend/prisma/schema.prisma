@@ -187,18 +187,21 @@ model Organization {
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
 
-  owners        Owner[]
-  staff         Staff[]
-  hostels       Hostel[]
-  rooms         Room[]
-  beds          Bed[]
-  residents     Resident[]
-  payments      Payment[]
-  complaints    Complaint[]
-  notifications Notification[]
-  invoices      Invoice[]
-  deposits      Deposit[]
-  discounts     Discount[]
+  owners            Owner[]
+  staff             Staff[]
+  hostels           Hostel[]
+  wings             Wing[]
+  rooms             Room[]
+  beds              Bed[]
+  residents         Resident[]
+  payments          Payment[]
+  complaints        Complaint[]
+  notifications     Notification[]
+  invoices          Invoice[]
+  deposits          Deposit[]
+  discounts         Discount[]
+  expenseCategories ExpenseCategory[]
+  expenses          Expense[]
 }
 
 model Owner {
@@ -244,6 +247,9 @@ model Staff {
   passwordHash String
   role         StaffRole
   status       StaffStatus @default(active)
+  // Fine-grained capabilities on top of the role. Values come from
+  // STAFF_PERMISSIONS (src/staff/permissions.ts) — currently "manageExpenses".
+  permissions  String[]    @default([])
   lastLoginAt  DateTime?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -261,7 +267,27 @@ model Hostel {
   updatedAt DateTime @updatedAt
 
   org   Organization @relation(fields: [orgId], references: [id])
+  wings Wing[]
   rooms Room[]
+}
+
+// Optional layer between a hostel and its rooms (e.g. "A Block", "Girls Wing").
+// A room may belong to no wing (null) — wings are opt-in per org.
+model Wing {
+  id        String   @id @default(uuid())
+  orgId     String
+  hostelId  String
+  name      String
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org    Organization @relation(fields: [orgId], references: [id])
+  hostel Hostel       @relation(fields: [hostelId], references: [id], onDelete: Cascade)
+  rooms  Room[]
+
+  @@unique([hostelId, name])
+  @@index([orgId])
 }
 
 // ---------- rooms & beds ----------
@@ -270,6 +296,7 @@ model Room {
   id                  String   @id @default(uuid())
   orgId               String
   hostelId            String
+  wingId              String?
   number              String
   floor               Int
   type                RoomType
@@ -283,6 +310,7 @@ model Room {
 
   org       Organization @relation(fields: [orgId], references: [id])
   hostel    Hostel       @relation(fields: [hostelId], references: [id])
+  wing      Wing?        @relation(fields: [wingId], references: [id])
   beds      Bed[]
   residents Resident[]
 
@@ -330,6 +358,10 @@ model Resident {
   monthlyFeePaisa      Int            @default(0)
   depositPaisa         Int            @default(0)
   duesPaisa            Int            @default(0)
+  // Prepaid rent balance: rent overpayments land here and net against dues on
+  // read (see common/dues.ts effectiveDues). Distinct from depositPaisa/Deposit
+  // (refundable security deposit) — this is credit toward future rent.
+  advanceBalancePaisa  Int            @default(0)
   notes                String?
   // Answers to the org's configurable admission form, keyed by field key.
   // Validated at write time against AdmissionFieldDefinition rows.
@@ -381,6 +413,9 @@ model Payment {
   paidAt         DateTime
   periodMonth    String? // "2026-07" for rent
   refundedPaisa  Int           @default(0)
+  // How much of this (rent) payment exceeded dues and became advance balance,
+  // captured at write time so dashboard "advance collected" is an exact fact.
+  advanceAppliedPaisa Int      @default(0)
   notes          String?
   recordedByName String
 
@@ -496,6 +531,43 @@ model DiscountApplication {
   discount Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
 
   @@unique([discountId, residentId])
+}
+
+// ---------- expenses ----------
+
+model ExpenseCategory {
+  id        String   @id @default(uuid())
+  orgId     String
+  name      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  org      Organization @relation(fields: [orgId], references: [id])
+  expenses Expense[]
+
+  @@unique([orgId, name])
+  @@index([orgId, sortOrder])
+}
+
+model Expense {
+  id             String        @id @default(uuid())
+  orgId          String
+  categoryId     String
+  label          String
+  amountPaisa    Int
+  method         PaymentMethod
+  spentAt        DateTime
+  notes          String?
+  attachmentKey  String? // storage key — served only via authenticated /files/:key
+  recordedByName String
+  createdAt      DateTime      @default(now())
+
+  org      Organization    @relation(fields: [orgId], references: [id])
+  category ExpenseCategory @relation(fields: [categoryId], references: [id])
+
+  @@index([orgId, spentAt])
+  @@index([orgId, categoryId])
 }
 
 // ---------- complaints ----------

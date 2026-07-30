@@ -1,15 +1,7 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Inject,
-  Param,
-  Post,
-  Put,
-} from "@nestjs/common";
+import { Controller, Delete, Get, Inject, Param, Post, Put } from "@nestjs/common";
 import { StaffRole, StaffStatus } from "@prisma/client";
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -19,7 +11,7 @@ import {
 } from "class-validator";
 import type { AuthUser } from "../common/auth-user";
 import { CurrentUser, Roles } from "../common/decorators";
-import { ValidatedBody, ValidatedQuery } from "../common/validated";
+import { ValidatedBody } from "../common/validated";
 import { StaffService } from "./staff.service";
 
 class AddStaffDto {
@@ -42,6 +34,11 @@ class AddStaffDto {
   @IsString()
   @MinLength(8)
   password?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  permissions?: string[];
 }
 
 class UpdateStaffDto {
@@ -61,6 +58,11 @@ class UpdateStaffDto {
   @IsOptional()
   @IsEnum(StaffStatus)
   status?: StaffStatus;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  permissions?: string[];
 }
 
 /** All staff-management routes are owner only. */
