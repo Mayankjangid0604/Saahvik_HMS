@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
-    "test:invoice-concurrency": "tsx test/invoice-concurrency.ts"
+    "test:invoice-concurrency": "tsx test/invoice-concurrency.ts",
+    "test:advance-concurrency": "tsx test/advance-concurrency.ts",
+    "test:refund-reversal": "tsx test/refund-reversal.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
