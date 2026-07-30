@@ -24,16 +24,16 @@ function MiniStat({
 export function SmallStatsGrid({ data }: { data: DashboardData }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-      <MiniStat label="Active Residents" value={String(data.activeResidents)} />
-      <MiniStat label="Advance Collection" value={formatMoney(data.advanceCollectedPaisa)} />
-      <MiniStat label="Cash Inflow" value={formatMoney(data.cashInflowPaisa)} />
-      <MiniStat label="Complaints" value={String(data.complaints.total)}>
+      <MiniStat label="Active Residents" value={String(data?.activeResidents ?? 0)} />
+      <MiniStat label="Advance Collection" value={formatMoney(data?.advanceCollectedPaisa ?? 0)} />
+      <MiniStat label="Cash Inflow" value={formatMoney(data?.cashInflowPaisa ?? 0)} />
+      <MiniStat label="Complaints" value={String(data?.complaints?.total ?? 0)}>
         <p className="mt-0.5 text-[11px] text-muted">
-          <span className="text-red-600">{data.complaints.active} active</span> ·{" "}
-          <span className="text-green-700">{data.complaints.resolved} resolved</span>
+          <span className="text-red-600">{data?.complaints?.active ?? 0} active</span> ·{" "}
+          <span className="text-green-700">{data?.complaints?.resolved ?? 0} resolved</span>
         </p>
       </MiniStat>
-      {data.expensesVisible && data.expense && (
+      {Boolean(data?.expensesVisible) && data?.expense?.totalPaisa != null && (
         <MiniStat label="Expense" value={formatMoney(data.expense.totalPaisa)} />
       )}
     </div>

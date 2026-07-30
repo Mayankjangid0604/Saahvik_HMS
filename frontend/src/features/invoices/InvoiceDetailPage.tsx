@@ -36,7 +36,7 @@ export function InvoiceDetailPage() {
     );
   }
 
-  const balance = invoice.totalPaisa - invoice.paidPaisa;
+  const balance = (invoice.totalPaisa ?? 0) - (invoice.paidPaisa ?? 0);
 
   const downloadPdf = () => {
     const url = generateTableReportPdf({

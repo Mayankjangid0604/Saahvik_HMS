@@ -53,22 +53,22 @@ export function DueResidentsList({ dues }: { dues: DueEntry[] }) {
 /** Expense Breakdown — styled after the reference screenshot (no budget-vs-actual line). */
 export function ExpenseBreakdown({ data }: { data: DashboardData }) {
   // Only rendered when expenses are visible; guard keeps the optional field safe.
-  const expense = data.expense;
-  if (!expense) return null;
-  const items = expense.breakdown.map((e) => ({
+  const expense = data?.expense;
+  if (!expense || expense.totalPaisa == null) return null;
+  const items = (expense.breakdown ?? []).map((e) => ({
     key: e.categoryId,
     label: e.label,
-    amountPaisa: e.amountPaisa,
-    pct: e.pct,
+    amountPaisa: e.amountPaisa ?? 0,
+    pct: e.pct ?? 0,
   }));
   return (
     <Card>
       <CardHeader
         title="Expense Breakdown"
-        subtitle={data.rangeLabel}
+        subtitle={data?.rangeLabel ?? ""}
         actions={
           <span className="font-mono text-sm font-semibold text-primary">
-            {formatMoney(expense.totalPaisa)}
+            {formatMoney(expense.totalPaisa ?? 0)}
           </span>
         }
       />

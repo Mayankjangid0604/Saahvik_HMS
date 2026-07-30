@@ -113,11 +113,11 @@ const defs: Record<string, ReportDef> = {
     fetch: async (f) =>
       (await getMonthlyCollectionReport(f)).map((r) => [
         formatMonth(r.month),
-        formatMoney(r.rentPaisa),
-        formatMoney(r.depositPaisa),
-        formatMoney(r.otherPaisa),
-        formatMoney(r.totalPaisa),
-        String(r.paymentCount),
+        formatMoney(r.rentPaisa ?? 0),
+        formatMoney(r.depositPaisa ?? 0),
+        formatMoney(r.otherPaisa ?? 0),
+        formatMoney(r.totalPaisa ?? 0),
+        String(r.paymentCount ?? 0),
       ]),
   },
 };

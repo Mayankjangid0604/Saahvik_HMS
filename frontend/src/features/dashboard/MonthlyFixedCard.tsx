@@ -9,7 +9,8 @@ import { cn } from "@/lib/cn";
  * as contradicting the range when e.g. "Today" is selected.
  */
 export function MonthlyFixedCard({ data }: { data: DashboardData }) {
-  const { collectionPaisa, advancePaisa, netProfitPaisa } = data.thisMonthFixed;
+  if (!data?.thisMonthFixed) return null;
+  const { collectionPaisa = 0, advancePaisa = 0, netProfitPaisa } = data.thisMonthFixed;
   const stats = [
     { label: "Total Collection", value: formatMoney(collectionPaisa), tone: "text-white" },
     { label: "Advance Earned", value: formatMoney(advancePaisa), tone: "text-white" },
