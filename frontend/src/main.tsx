@@ -9,6 +9,7 @@ import { AuthProvider } from "@/features/auth/AuthContext";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
+import { RouteErrorBoundary } from "@/components/layout/RouteErrorBoundary";
 
 import { LandingPage } from "@/pages/Landing/LandingPage";
 import { LoginPage } from "@/features/auth/LoginPage";
@@ -60,17 +61,18 @@ const queryClient = new QueryClient({
 });
 
 const router = createBrowserRouter([
-  { path: "/", element: <LandingPage /> },
-  { path: "/login", element: <LoginPage /> },
-  { path: "/signup", element: <SignupPage /> },
-  { path: "/forgot-password", element: <ForgotPasswordPage /> },
-  { path: "/2fa", element: <TwoFactorPage /> },
+  { path: "/", element: <LandingPage />, errorElement: <RouteErrorBoundary /> },
+  { path: "/login", element: <LoginPage />, errorElement: <RouteErrorBoundary /> },
+  { path: "/signup", element: <SignupPage />, errorElement: <RouteErrorBoundary /> },
+  { path: "/forgot-password", element: <ForgotPasswordPage />, errorElement: <RouteErrorBoundary /> },
+  { path: "/2fa", element: <TwoFactorPage />, errorElement: <RouteErrorBoundary /> },
   {
     element: (
       <ProtectedRoute>
         <AppShell />
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorBoundary />,
     children: [
       { path: "dashboard", element: <DashboardPage /> },
       { path: "setup", element: <HostelSetupPage /> },
