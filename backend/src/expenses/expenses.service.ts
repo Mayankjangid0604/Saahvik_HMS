@@ -4,6 +4,7 @@ import { AuditService } from "../audit/audit.service";
 import { ApiError } from "../common/api-error";
 import type { AuthUser } from "../common/auth-user";
 import { pageArgs, paginated, type Paginated } from "../common/pagination";
+import { userHasPermission } from "../common/permissions";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
   CreateExpenseCategoryDto,
@@ -66,12 +67,7 @@ export class ExpensesService {
 
   /** Throws 403 unless the caller is an owner or a staff member with manageExpenses. */
   async requireManageExpenses(user: AuthUser): Promise<void> {
-    if (user.role === "owner") return;
-    const staff = await this.prisma.staff.findFirst({
-      where: { id: user.userId, orgId: user.orgId },
-      select: { permissions: true },
-    });
-    if (!staff || !staff.permissions.includes("manageExpenses")) {
+    if (!(await userHasPermission(this.prisma, user, "manageExpenses"))) {
       throw new ForbiddenException("You do not have permission to manage expenses");
     }
   }

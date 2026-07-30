@@ -3,6 +3,7 @@ import { Prisma, ResidentStatus } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { ApiError } from "../common/api-error";
 import type { AuthUser } from "../common/auth-user";
+import { effectiveDues } from "../common/dues";
 import { pageArgs, paginated, type Paginated } from "../common/pagination";
 import { fileUrl } from "../files/files.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -54,7 +55,10 @@ export function toResidentDto(r: ResidentWithRefs) {
     institutionOrCompany: r.institutionOrCompany ?? undefined,
     monthlyFeePaisa: r.monthlyFeePaisa,
     depositPaisa: r.depositPaisa,
-    duesPaisa: r.duesPaisa,
+    // Dues shown net of advance; advance surfaced separately so an owner sees
+    // "why dues aren't rising" (a positive advance balance covering rent).
+    duesPaisa: effectiveDues(r.duesPaisa, r.advanceBalancePaisa),
+    advanceBalancePaisa: r.advanceBalancePaisa,
     notes: r.notes ?? undefined,
     admissionData: (r.admissionData ?? undefined) as Record<string, string> | undefined,
   };

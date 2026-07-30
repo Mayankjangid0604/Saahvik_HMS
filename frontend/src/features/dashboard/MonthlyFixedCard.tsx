@@ -13,11 +13,16 @@ export function MonthlyFixedCard({ data }: { data: DashboardData }) {
   const stats = [
     { label: "Total Collection", value: formatMoney(collectionPaisa), tone: "text-white" },
     { label: "Advance Earned", value: formatMoney(advancePaisa), tone: "text-white" },
-    {
-      label: "Net Profit",
-      value: formatMoney(netProfitPaisa),
-      tone: netProfitPaisa >= 0 ? "text-green-300" : "text-red-300",
-    },
+    // Net Profit reveals expenses — omitted for users who can't see them.
+    ...(netProfitPaisa != null
+      ? [
+          {
+            label: "Net Profit",
+            value: formatMoney(netProfitPaisa),
+            tone: netProfitPaisa >= 0 ? "text-green-300" : "text-red-300",
+          },
+        ]
+      : []),
   ];
   return (
     <div className="rounded-lg bg-primary p-4 text-white">

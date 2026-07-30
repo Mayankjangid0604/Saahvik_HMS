@@ -358,6 +358,10 @@ model Resident {
   monthlyFeePaisa      Int            @default(0)
   depositPaisa         Int            @default(0)
   duesPaisa            Int            @default(0)
+  // Prepaid rent balance: rent overpayments land here and net against dues on
+  // read (see common/dues.ts effectiveDues). Distinct from depositPaisa/Deposit
+  // (refundable security deposit) — this is credit toward future rent.
+  advanceBalancePaisa  Int            @default(0)
   notes                String?
   // Answers to the org's configurable admission form, keyed by field key.
   // Validated at write time against AdmissionFieldDefinition rows.
@@ -409,6 +413,9 @@ model Payment {
   paidAt         DateTime
   periodMonth    String? // "2026-07" for rent
   refundedPaisa  Int           @default(0)
+  // How much of this (rent) payment exceeded dues and became advance balance,
+  // captured at write time so dashboard "advance collected" is an exact fact.
+  advanceAppliedPaisa Int      @default(0)
   notes          String?
   recordedByName String
 

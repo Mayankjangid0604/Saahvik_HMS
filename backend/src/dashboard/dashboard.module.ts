@@ -3,6 +3,7 @@ import type { PaymentMethod } from "@prisma/client";
 import { IsIn, IsOptional } from "class-validator";
 import type { AuthUser } from "../common/auth-user";
 import { CurrentUser } from "../common/decorators";
+import { userHasPermission } from "../common/permissions";
 import { ValidatedQuery } from "../common/validated";
 import { toPaymentDto, PaymentsService } from "../finance/payments.service";
 import { FinanceModule } from "../finance/finance.module";
@@ -160,7 +161,9 @@ export class DashboardService {
       openComplaints,
       complaintCounts,
       activeResidents,
+      advanceBalanceAgg,
       dues,
+      expensesVisible,
     ] = await Promise.all([
       this.prisma.bed.findMany({
         where: { orgId },
@@ -173,11 +176,11 @@ export class DashboardService {
       }),
       this.prisma.payment.findMany({
         where: { orgId, paidAt: { gte: start, lte: end } },
-        select: { paidAt: true, amountPaisa: true, refundedPaisa: true, method: true, type: true },
+        select: { paidAt: true, amountPaisa: true, refundedPaisa: true, method: true, type: true, advanceAppliedPaisa: true },
       }),
       this.prisma.payment.findMany({
         where: { orgId, paidAt: { gte: monthStart, lte: now } },
-        select: { paidAt: true, amountPaisa: true, refundedPaisa: true, method: true, type: true },
+        select: { paidAt: true, amountPaisa: true, refundedPaisa: true, method: true, type: true, advanceAppliedPaisa: true },
       }),
       this.prisma.expense.findMany({
         where: { orgId, spentAt: { gte: start, lte: end } },
@@ -208,7 +211,12 @@ export class DashboardService {
         _count: { _all: true },
       }),
       this.prisma.resident.count({ where: { orgId, status: "active" } }),
+      this.prisma.resident.aggregate({
+        where: { orgId, status: "active" },
+        _sum: { advanceBalancePaisa: true },
+      }),
       this.payments.buildDues(orgId),
+      userHasPermission(this.prisma, user, "manageExpenses"),
     ]);
 
     // ----- occupancy (point in time), overall + per hostel -----
@@ -229,9 +237,10 @@ export class DashboardService {
 
     // ----- collection (range), by method -----
     const collection = this.collectionOf(rangePayments);
-    const advanceCollectedPaisa = rangePayments
-      .filter((p) => p.type === "deposit")
-      .reduce((s, p) => s + netOf(p), 0);
+    // Advance collected = rent overpayment routed to advance this range (exact
+    // fact persisted per payment), NOT security-deposit intake.
+    const advanceCollectedPaisa = rangePayments.reduce((s, p) => s + p.advanceAppliedPaisa, 0);
+    const advanceBalanceTotalPaisa = advanceBalanceAgg._sum.advanceBalancePaisa ?? 0;
 
     // ----- expenses (range) + breakdown -----
     const expenseTotal = rangeExpenses.reduce((s, e) => s + e.amountPaisa, 0);
@@ -275,9 +284,7 @@ export class DashboardService {
 
     // ----- fixed "this calendar month" card (never range-filtered) -----
     const monthCollection = monthPayments.reduce((s, p) => s + netOf(p), 0);
-    const monthAdvance = monthPayments
-      .filter((p) => p.type === "deposit")
-      .reduce((s, p) => s + netOf(p), 0);
+    const monthAdvance = monthPayments.reduce((s, p) => s + p.advanceAppliedPaisa, 0);
     const monthExpenseTotal = monthExpenses.reduce((s, e) => s + e.amountPaisa, 0);
 
     return {
@@ -297,12 +304,21 @@ export class DashboardService {
         highSeverityCount: dues.filter((d) => d.severity === "high").length,
       },
       collection: { totalPaisa: collection.total, byMethod: collection.byMethod },
-      netProfitPaisa: collection.total - expenseTotal,
       activeResidents,
       advanceCollectedPaisa,
+      advanceBalanceTotalPaisa,
       cashInflowPaisa: collection.byMethod.cash,
       complaints,
-      expense: { totalPaisa: expenseTotal, breakdown: expenseBreakdown },
+      // Profit + expense figures reveal spending — only for owners / staff with
+      // manageExpenses. The frontend gates the Profit and Expense cards on this
+      // flag; the keys are genuinely absent (not zeroed) when hidden.
+      expensesVisible,
+      ...(expensesVisible
+        ? {
+            netProfitPaisa: collection.total - expenseTotal,
+            expense: { totalPaisa: expenseTotal, breakdown: expenseBreakdown },
+          }
+        : {}),
       collectionsChart,
       recentPayments: recentPayments.map(toPaymentDto),
       recentComplaints: openComplaints.map((c) => ({
@@ -334,7 +350,8 @@ export class DashboardService {
       thisMonthFixed: {
         collectionPaisa: monthCollection,
         advancePaisa: monthAdvance,
-        netProfitPaisa: monthCollection - monthExpenseTotal,
+        // Net profit reveals expenses too — omit for users who can't see them.
+        ...(expensesVisible ? { netProfitPaisa: monthCollection - monthExpenseTotal } : {}),
       },
     };
   }

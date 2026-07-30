@@ -44,7 +44,9 @@ function BigCard({
 export function LargeStatsGrid({ data }: { data: DashboardData }) {
   const { occupancy, dues, collection, netProfitPaisa } = data;
   const showProperties = occupancy.byProperty.length > 1;
-  const profitPositive = netProfitPaisa >= 0;
+  // Profit reveals expenses — hidden for staff without manageExpenses.
+  const showProfit = data.expensesVisible && netProfitPaisa != null;
+  const profitPositive = (netProfitPaisa ?? 0) >= 0;
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -94,21 +96,23 @@ export function LargeStatsGrid({ data }: { data: DashboardData }) {
         </div>
       </BigCard>
 
-      {/* Profit */}
-      <BigCard label="Net Profit">
-        <p
-          className={cn(
-            "mt-1 font-mono text-2xl font-semibold",
-            profitPositive ? "text-green-700" : "text-red-600",
-          )}
-        >
-          {formatMoney(netProfitPaisa)}
-        </p>
-        <p className="mt-0.5 text-xs text-muted">Collection − expenses, this range</p>
-        <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-muted">
-          {profitPositive ? "In the black for this range." : "Spending outpaced collection."}
-        </p>
-      </BigCard>
+      {/* Profit — omitted entirely for users who can't see expenses */}
+      {showProfit && (
+        <BigCard label="Net Profit">
+          <p
+            className={cn(
+              "mt-1 font-mono text-2xl font-semibold",
+              profitPositive ? "text-green-700" : "text-red-600",
+            )}
+          >
+            {formatMoney(netProfitPaisa!)}
+          </p>
+          <p className="mt-0.5 text-xs text-muted">Collection − expenses, this range</p>
+          <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-muted">
+            {profitPositive ? "In the black for this range." : "Spending outpaced collection."}
+          </p>
+        </BigCard>
+      )}
     </div>
   );
 }

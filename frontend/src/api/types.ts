@@ -256,7 +256,10 @@ export interface Resident {
   institutionOrCompany?: string;
   monthlyFeePaisa: number;
   depositPaisa: number;
+  /** Dues NET of advance balance (a fully-covered resident reads 0). */
   duesPaisa: number;
+  /** Prepaid rent credit from overpayments; nets against dues on read. */
+  advanceBalancePaisa: number;
   notes?: string;
   /** Answers to the configurable admission form, keyed by field key. */
   admissionData?: Record<string, string>;
@@ -267,7 +270,10 @@ export interface ResidentListParams extends ListParams {
   roomId?: string;
 }
 
-export type CreateResidentInput = Omit<Resident, "id" | "duesPaisa" | "status" | "roomNumber" | "bedLabel"> & {
+export type CreateResidentInput = Omit<
+  Resident,
+  "id" | "duesPaisa" | "advanceBalancePaisa" | "status" | "roomNumber" | "bedLabel"
+> & {
   status?: ResidentStatus;
 };
 
@@ -632,13 +638,22 @@ export interface DashboardData {
     totalPaisa: number;
     byMethod: CollectionByMethod;
   };
-  /** Collection − expenses for the range. */
-  netProfitPaisa: number;
+  /**
+   * Collection − expenses for the range. Present only when `expensesVisible`
+   * — omitted for staff without the manageExpenses permission.
+   */
+  netProfitPaisa?: number;
   activeResidents: number;
+  /** Rent overpayment routed to advance during the range. */
   advanceCollectedPaisa: number;
+  /** Live snapshot: total prepaid advance held across active residents. */
+  advanceBalanceTotalPaisa: number;
   cashInflowPaisa: number;
   complaints: { total: number; active: number; resolved: number };
-  expense: {
+  /** Whether profit/expense figures are included (owner or manageExpenses). */
+  expensesVisible: boolean;
+  /** Present only when `expensesVisible`. */
+  expense?: {
     totalPaisa: number;
     breakdown: ExpenseBreakdownItem[];
   };
@@ -652,7 +667,8 @@ export interface DashboardData {
   thisMonthFixed: {
     collectionPaisa: number;
     advancePaisa: number;
-    netProfitPaisa: number;
+    /** Present only when `expensesVisible`. */
+    netProfitPaisa?: number;
   };
 }
 

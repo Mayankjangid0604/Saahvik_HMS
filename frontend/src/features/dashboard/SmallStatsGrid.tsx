@@ -33,7 +33,9 @@ export function SmallStatsGrid({ data }: { data: DashboardData }) {
           <span className="text-green-700">{data.complaints.resolved} resolved</span>
         </p>
       </MiniStat>
-      <MiniStat label="Expense" value={formatMoney(data.expense.totalPaisa)} />
+      {data.expensesVisible && data.expense && (
+        <MiniStat label="Expense" value={formatMoney(data.expense.totalPaisa)} />
+      )}
     </div>
   );
 }

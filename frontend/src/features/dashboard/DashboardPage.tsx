@@ -97,9 +97,9 @@ export function DashboardPage() {
             <RecentComplaints complaints={data.recentComplaints} />
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className={`grid gap-3 ${data.expensesVisible ? "lg:grid-cols-2" : ""}`}>
             <DueResidentsList dues={data.dueResidents} />
-            <ExpenseBreakdown data={data} />
+            {data.expensesVisible && <ExpenseBreakdown data={data} />}
           </div>
 
           <MonthlyFixedCard data={data} />
