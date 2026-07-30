@@ -14,7 +14,10 @@ import type {
 } from "./dto";
 
 type RoomWithBeds = Prisma.RoomGetPayload<{
-  include: { beds: { include: { resident: { select: { name: true } } } } };
+  include: {
+    beds: { include: { resident: { select: { name: true } } } };
+    wing: { select: { name: true } };
+  };
 }>;
 
 const ROOM_INCLUDE = {
@@ -22,6 +25,7 @@ const ROOM_INCLUDE = {
     include: { resident: { select: { name: true } } },
     orderBy: { label: "asc" as const },
   },
+  wing: { select: { name: true } },
 } satisfies Prisma.RoomInclude;
 
 /** Frontend `Room` shape, beds inline with occupant names. */
@@ -43,6 +47,8 @@ export function toRoomDto(room: RoomWithBeds) {
     monthlyRentPaisa: room.monthlyRentPaisa,
     feeMode: room.feeMode,
     fixedFeeAmountPaisa: room.fixedFeeAmountPaisa,
+    wingId: room.wingId ?? undefined,
+    wingName: room.wing?.name,
     beds,
     occupiedCount: beds.filter((b) => b.status === "occupied").length,
     notes: room.notes ?? undefined,
@@ -55,6 +61,18 @@ export class RoomsService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
+
+  /** Validate an optional wingId belongs to this org + hostel; returns null when unset. */
+  private async resolveWingId(
+    orgId: string,
+    hostelId: string,
+    wingId: string | undefined,
+  ): Promise<string | null> {
+    if (!wingId) return null;
+    const wing = await this.prisma.wing.findFirst({ where: { id: wingId, orgId, hostelId } });
+    if (!wing) throw ApiError.badRequest("Selected wing does not belong to this hostel");
+    return wing.id;
+  }
 
   async list(user: AuthUser, params: RoomListParamsDto): Promise<Paginated<unknown>> {
     const where: Prisma.RoomWhereInput = { orgId: user.orgId };
@@ -106,11 +124,13 @@ export class RoomsService {
       throw new ApiError(HttpStatus.CONFLICT, "ROOM_EXISTS", `${dto.number} already exists`);
     }
 
+    const wingId = await this.resolveWingId(user.orgId, hostel.id, dto.wingId);
     const fixedFee = dto.feeMode === "fixed" ? (dto.fixedFeeAmountPaisa ?? 0) : null;
     const room = await this.prisma.room.create({
       data: {
         orgId: user.orgId,
         hostelId: hostel.id,
+        wingId,
         number: dto.number,
         floor: dto.floor,
         type: dto.type,
@@ -143,6 +163,7 @@ export class RoomsService {
     const hostel = await this.prisma.hostel.findFirst({ where: { orgId: user.orgId } });
     if (!hostel) throw ApiError.badRequest("Organization has no hostel configured");
 
+    const wingId = await this.resolveWingId(user.orgId, hostel.id, dto.wingId);
     const fixedFee = dto.feeMode === "fixed" ? (dto.fixedFeeAmountPaisa ?? 0) : null;
     let created = 0;
     for (let i = 0; i < dto.count; i++) {
@@ -155,6 +176,7 @@ export class RoomsService {
         data: {
           orgId: user.orgId,
           hostelId: hostel.id,
+          wingId,
           number,
           floor: dto.floor,
           type: dto.type,

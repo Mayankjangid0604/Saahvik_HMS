@@ -10,16 +10,20 @@ import {
   FileText,
   ShieldCheck,
   BadgePercent,
+  Wallet,
   Wrench,
   BarChart3,
   UserCog,
   Building2,
+  LayoutGrid,
+  Tags,
   Bell,
   ClipboardList,
   CreditCard,
   DatabaseBackup,
   type LucideIcon,
 } from "lucide-react";
+import type { StaffPermission } from "@/api/types";
 
 export interface NavItem {
   label: string;
@@ -27,6 +31,8 @@ export interface NavItem {
   icon: LucideIcon;
   /** Match nested paths too (e.g. /payments/:id) */
   end?: boolean;
+  /** Owners always see it; staff only if they hold this permission. */
+  requires?: StaffPermission;
 }
 
 export interface NavGroup {
@@ -54,6 +60,7 @@ export const navGroups: NavGroup[] = [
     label: "Finance",
     items: [
       { label: "Payments", to: "/payments", icon: IndianRupee },
+      { label: "Expenses", to: "/expenses", icon: Wallet, requires: "manageExpenses" },
       { label: "Fees & Assignments", to: "/fees", icon: ReceiptText },
       { label: "Dues", to: "/dues", icon: AlarmClock },
       { label: "Invoices", to: "/invoices", icon: FileText },
@@ -75,6 +82,13 @@ export const navGroups: NavGroup[] = [
     label: "Settings",
     items: [
       { label: "Organization", to: "/settings", icon: Building2, end: true },
+      { label: "Wings", to: "/settings/wings", icon: LayoutGrid },
+      {
+        label: "Expense Categories",
+        to: "/settings/expense-categories",
+        icon: Tags,
+        requires: "manageExpenses",
+      },
       { label: "Notifications", to: "/notifications", icon: Bell },
       { label: "Admission Form", to: "/settings/admission-form", icon: ClipboardList },
       { label: "Subscription", to: "/settings/subscription", icon: CreditCard },

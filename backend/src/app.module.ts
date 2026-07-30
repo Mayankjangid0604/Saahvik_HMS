@@ -7,8 +7,10 @@ import { JwtAuthGuard } from "./common/jwt-auth.guard";
 import { RolesGuard } from "./common/roles.guard";
 import { ComplaintsModule } from "./complaints/complaints.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
+import { ExpensesModule } from "./expenses/expenses.module";
 import { FilesModule } from "./files/files.module";
 import { FinanceModule } from "./finance/finance.module";
+import { WingsModule } from "./wings/wings.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PdfModule } from "./pdf/pdf.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -34,11 +36,13 @@ import { HealthController } from "./health.controller";
     AuthModule,
     SettingsModule,
     RoomsModule,
+    WingsModule,
     ResidentsModule,
     StaffModule,
     ComplaintsModule,
     NotificationsModule,
     FinanceModule,
+    ExpensesModule,
     DashboardModule,
     ReportsModule,
     FilesModule,

@@ -1,14 +1,37 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, KeyRound, LogOut, Menu, ShieldCheck, UserRound } from "lucide-react";
+import {
+  Bell,
+  ChevronRight,
+  KeyRound,
+  LogOut,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
 import { useAuth } from "@/features/auth/AuthContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { Dropdown, DropdownItem, DropdownSeparator } from "@/components/ui/Dropdown";
 import { getUnreadCount } from "@/api/notification.api";
+import { resolveBreadcrumbLabel } from "./breadcrumb";
+import { Clock } from "./Clock";
+import { ThemeToggle } from "./ThemeToggle";
 
-export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
+export function TopBar({
+  onMenuClick,
+  collapsed,
+  onToggleCollapse,
+}: {
+  onMenuClick: () => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+}) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const pageLabel = resolveBreadcrumbLabel(pathname);
 
   const { data: unread = 0 } = useQuery({
     queryKey: ["notifications", "unread-count"],
@@ -17,7 +40,8 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   });
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-3 sm:px-4">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-3 sm:gap-3 sm:px-4">
+      {/* Mobile: open the drawer. Desktop: collapse the sidebar. */}
       <button
         onClick={onMenuClick}
         className="rounded p-1.5 text-muted hover:bg-slate-100 md:hidden"
@@ -25,8 +49,25 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
       >
         <Menu className="h-5 w-5" />
       </button>
+      <button
+        onClick={onToggleCollapse}
+        className="hidden rounded p-1.5 text-muted hover:bg-slate-100 hover:text-ink md:inline-flex"
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+      </button>
+
+      {/* Breadcrumb: "Saahvik HMS" › current page. */}
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm">
+        <span className="hidden shrink-0 font-medium text-muted sm:inline">Saahvik HMS</span>
+        <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-slate-300 sm:inline" />
+        <span className="truncate font-semibold text-ink">{pageLabel}</span>
+      </nav>
 
       <div className="flex-1" />
+
+      <Clock />
 
       <Link
         to="/notifications"
@@ -40,6 +81,8 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
           </span>
         )}
       </Link>
+
+      <ThemeToggle />
 
       <Dropdown
         trigger={

@@ -6,6 +6,7 @@ import { AuditService } from "../audit/audit.service";
 import { ApiError } from "../common/api-error";
 import type { AuthUser } from "../common/auth-user";
 import { PrismaService } from "../prisma/prisma.service";
+import { sanitizePermissions, STAFF_PERMISSIONS } from "./permissions";
 
 /**
  * Basic plan: total logins per org (owners + active staff) hard-capped at 3.
@@ -21,6 +22,7 @@ function toStaffMemberDto(s: Staff) {
     role: "staff" as const,
     staffRole: s.role,
     status: s.status,
+    permissions: s.permissions,
     addedAt: s.createdAt.toISOString(),
     lastActiveAt: s.lastLoginAt?.toISOString(),
   };
@@ -49,6 +51,8 @@ export class StaffService {
         email: o.email,
         phone: o.phone ?? "",
         role: "owner" as const,
+        // Owners implicitly hold every capability.
+        permissions: [...STAFF_PERMISSIONS] as string[],
         addedAt: o.createdAt.toISOString(),
         lastActiveAt: undefined as string | undefined,
       })),
@@ -65,7 +69,14 @@ export class StaffService {
 
   async create(
     user: AuthUser,
-    input: { name: string; email: string; phone?: string; role?: StaffRole; password?: string },
+    input: {
+      name: string;
+      email: string;
+      phone?: string;
+      role?: StaffRole;
+      password?: string;
+      permissions?: string[];
+    },
   ) {
     // Hard block at login #4: owners + active staff, counted server-side.
     const [ownerCount, staffCount] = await this.prisma.$transaction([
@@ -101,6 +112,7 @@ export class StaffService {
         phone: input.phone,
         passwordHash: await bcrypt.hash(tempPassword, 10),
         role: input.role ?? "manager",
+        permissions: sanitizePermissions(input.permissions),
       },
     });
     await this.prisma.notificationPreference.create({
@@ -123,7 +135,13 @@ export class StaffService {
   async update(
     user: AuthUser,
     id: string,
-    input: { name?: string; role?: StaffRole; status?: StaffStatus; phone?: string },
+    input: {
+      name?: string;
+      role?: StaffRole;
+      status?: StaffStatus;
+      phone?: string;
+      permissions?: string[];
+    },
   ) {
     const existing = await this.prisma.staff.findFirst({ where: { id, orgId: user.orgId } });
     if (!existing) throw ApiError.notFound("Staff member");
@@ -151,6 +169,7 @@ export class StaffService {
         role: input.role,
         status: input.status,
         phone: input.phone,
+        ...(input.permissions ? { permissions: sanitizePermissions(input.permissions) } : {}),
       },
     });
     await this.audit.log(user, {

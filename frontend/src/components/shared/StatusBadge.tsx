@@ -38,6 +38,7 @@ const registry: Record<string, { label: string; tone: BadgeTone }> = {
   // misc
   owner: { label: "Owner", tone: "gold" },
   staff: { label: "Staff", tone: "blue" },
+  inactive: { label: "Inactive", tone: "slate" },
   queued: { label: "Queued", tone: "slate" },
   processing: { label: "Processing", tone: "amber" },
   ready: { label: "Ready", tone: "green" },
