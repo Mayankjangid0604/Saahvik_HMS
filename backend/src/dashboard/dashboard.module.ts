@@ -237,9 +237,15 @@ export class DashboardService {
 
     // ----- collection (range), by method -----
     const collection = this.collectionOf(rangePayments);
-    // Advance collected = rent overpayment routed to advance this range (exact
-    // fact persisted per payment), NOT security-deposit intake.
-    const advanceCollectedPaisa = rangePayments.reduce((s, p) => s + p.advanceAppliedPaisa, 0);
+    // Advance collected = rent overpayment routed to advance this range, NET of
+    // refunds. A refund unwinds the advance portion first (see
+    // PaymentsService.refund), so the advance still standing for a payment is
+    // max(0, advanceApplied − refunded). This keeps the metric consistent with
+    // the resident advance balances and with the refund-aware Total Collection.
+    const advanceCollectedPaisa = rangePayments.reduce(
+      (s, p) => s + Math.max(0, p.advanceAppliedPaisa - p.refundedPaisa),
+      0,
+    );
     const advanceBalanceTotalPaisa = advanceBalanceAgg._sum.advanceBalancePaisa ?? 0;
 
     // ----- expenses (range) + breakdown -----
@@ -284,7 +290,10 @@ export class DashboardService {
 
     // ----- fixed "this calendar month" card (never range-filtered) -----
     const monthCollection = monthPayments.reduce((s, p) => s + netOf(p), 0);
-    const monthAdvance = monthPayments.reduce((s, p) => s + p.advanceAppliedPaisa, 0);
+    const monthAdvance = monthPayments.reduce(
+      (s, p) => s + Math.max(0, p.advanceAppliedPaisa - p.refundedPaisa),
+      0,
+    );
     const monthExpenseTotal = monthExpenses.reduce((s, e) => s + e.amountPaisa, 0);
 
     return {
