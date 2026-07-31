@@ -96,6 +96,19 @@ export class CreateResidentDto {
   @IsString()
   notes?: string;
 
+  // ID document expiry (feature 4) — ISO date string, nullable.
+  @IsOptional()
+  @IsString()
+  idDocExpiryDate?: string;
+
+  // Medical / dietary info (feature 7) — sensitive, same access as other PII.
+  @IsOptional() @IsString() bloodGroup?: string;
+  @IsOptional() @IsString() allergies?: string;
+  @IsOptional() @IsString() dietaryPreference?: string;
+  @IsOptional() @IsString() medicalNotes?: string;
+  @IsOptional() @IsString() emergencyContactName?: string;
+  @IsOptional() @IsString() emergencyContactPhone?: string;
+
   @IsOptional()
   @IsObject()
   admissionData?: Record<string, unknown>;
@@ -172,6 +185,17 @@ export class UpdateResidentDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  idDocExpiryDate?: string;
+
+  @IsOptional() @IsString() bloodGroup?: string;
+  @IsOptional() @IsString() allergies?: string;
+  @IsOptional() @IsString() dietaryPreference?: string;
+  @IsOptional() @IsString() medicalNotes?: string;
+  @IsOptional() @IsString() emergencyContactName?: string;
+  @IsOptional() @IsString() emergencyContactPhone?: string;
 
   @IsOptional()
   @IsObject()
