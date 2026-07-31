@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import { ArrowLeftRight, BedDouble, Layers, Pencil, Plus, Search, Settings2 } from "lucide-react";
-import { listAllRooms, listRooms } from "@/api/hostel.api";
+import { listAllRooms, listRooms, updateRoomFee } from "@/api/hostel.api";
 import type { Room } from "@/api/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -13,6 +13,8 @@ import { DataTable } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { MoneyDisplay } from "@/components/shared/MoneyDisplay";
+import { Switch } from "@/components/ui/Switch";
+import { useToast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePagination } from "@/hooks/usePagination";
 import { AddRoomDialog } from "./AddRoomDialog";
@@ -32,6 +34,8 @@ const typeLabels: Record<Room["type"], string> = {
 export function RoomsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [floor, setFloor] = useState("");
   const [type, setType] = useState("all");
@@ -44,6 +48,17 @@ export function RoomsPage() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [feeRoom, setFeeRoom] = useState<Room | null>(null);
   const [editRoom, setEditRoom] = useState<Room | null>(null);
+
+  const toggleOffMutation = useMutation({
+    mutationFn: (roomId: string) =>
+      updateRoomFee(roomId, { feeMode: "variable", fixedFeeAmountPaisa: null }),
+    onSuccess: (room) => {
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["residents"] });
+      toast({ title: `${room.number} switched to per-resident fee`, variant: "success" });
+    },
+    onError: (err: Error) => toast({ title: "Update failed", description: err.message, variant: "error" }),
+  });
 
   // Filter options come from the rooms that actually exist (Change 4)
   const { data: allRooms } = useQuery({ queryKey: ["rooms", "all"], queryFn: listAllRooms });
@@ -103,21 +118,34 @@ export function RoomsPage() {
       },
       {
         accessorKey: "monthlyRentPaisa",
-        header: "Fee / bed",
+        header: "Fixed fee",
         cell: ({ row }) => {
           const r = row.original;
-          if (r.feeMode === "fixed" && r.fixedFeeAmountPaisa != null) {
-            return (
-              <span className="flex items-center gap-1.5">
-                <MoneyDisplay paisa={r.fixedFeeAmountPaisa} />
-                <Badge tone="gold">Fixed</Badge>
-              </span>
-            );
-          }
-          return r.monthlyRentPaisa > 0 ? (
-            <MoneyDisplay paisa={r.monthlyRentPaisa} />
-          ) : (
-            <span className="text-muted">Per resident</span>
+          const isFixed = r.feeMode === "fixed" && r.fixedFeeAmountPaisa != null;
+          return (
+            <span className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <Switch
+                checked={isFixed}
+                label={`Fixed fee for ${r.number}`}
+                onChange={(on) => {
+                  if (on) {
+                    setFeeRoom(r);
+                  } else {
+                    toggleOffMutation.mutate(r.id);
+                  }
+                }}
+              />
+              {isFixed ? (
+                <button
+                  className="flex items-center gap-1 text-xs text-accent-600 hover:underline"
+                  onClick={() => setFeeRoom(r)}
+                >
+                  <MoneyDisplay paisa={r.fixedFeeAmountPaisa!} />
+                </button>
+              ) : (
+                <span className="text-xs text-muted">Per resident</span>
+              )}
+            </span>
           );
         },
       },
