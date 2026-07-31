@@ -362,6 +362,11 @@ model Resident {
   // read (see common/dues.ts effectiveDues). Distinct from depositPaisa/Deposit
   // (refundable security deposit) — this is credit toward future rent.
   advanceBalancePaisa  Int            @default(0)
+  // "YYYY-MM" (Asia/Kolkata) of the last month this resident's rent was
+  // accrued into duesPaisa by the monthly cron (finance/dues-accrual.service.ts).
+  // Null until the first accrual run. Guards against double-accrual on
+  // cron restart/overlap.
+  lastDuesAccrualPeriod String?
   notes                String?
   // Answers to the org's configurable admission form, keyed by field key.
   // Validated at write time against AdmissionFieldDefinition rows.

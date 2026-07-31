@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { DepositsService } from "./deposits.service";
+import { DuesAccrualService } from "./dues-accrual.service";
 import { DiscountsService } from "./discounts.service";
 import { FeesService } from "./fees.service";
 import {
@@ -22,7 +23,7 @@ import { PaymentsService } from "./payments.service";
     DepositsController,
     DiscountsController,
   ],
-  providers: [PaymentsService, FeesService, InvoicesService, DepositsService, DiscountsService],
+  providers: [PaymentsService, FeesService, InvoicesService, DepositsService, DiscountsService, DuesAccrualService],
   exports: [PaymentsService],
 })
 export class FinanceModule {}

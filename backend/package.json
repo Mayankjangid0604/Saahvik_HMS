@@ -12,13 +12,16 @@
     "prisma:migrate": "prisma migrate deploy",
     "test:invoice-concurrency": "tsx test/invoice-concurrency.ts",
     "test:advance-concurrency": "tsx test/advance-concurrency.ts",
-    "test:refund-reversal": "tsx test/refund-reversal.ts"
+    "test:refund-reversal": "tsx test/refund-reversal.ts",
+    "test:dues-sort": "tsx test/dues-sort.ts",
+    "test:dues-accrual": "tsx test/dues-accrual.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/schedule": "^6.1.3",
     "@prisma/client": "^6.5.0",
     "bcryptjs": "^3.0.2",
     "class-transformer": "^0.5.1",

@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
+import { ScheduleModule } from "@nestjs/schedule";
 import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { JwtAuthGuard } from "./common/jwt-auth.guard";
@@ -30,6 +31,7 @@ import { HealthController } from "./health.controller";
       // admit the template-literal form, hence the cast for env values.
       signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN ?? "1d") as unknown as number },
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     PdfModule,
     AuditModule,
