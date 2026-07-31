@@ -10,6 +10,7 @@ import type {
   CreateRoomDto,
   RoomListParamsDto,
   RoomTransferDto,
+  UpdateRoomDto,
   UpdateRoomFeeDto,
 } from "./dto";
 
@@ -203,6 +204,47 @@ export class RoomsService {
       details: { ...dto, created },
     });
     return { created };
+  }
+
+  async update(user: AuthUser, roomId: string, dto: UpdateRoomDto) {
+    const room = await this.prisma.room.findFirst({
+      where: { id: roomId, orgId: user.orgId },
+    });
+    if (!room) throw ApiError.notFound("Room");
+
+    if (dto.number && dto.number !== room.number) {
+      const dupe = await this.prisma.room.findFirst({
+        where: { orgId: user.orgId, number: { equals: dto.number, mode: "insensitive" }, id: { not: room.id } },
+      });
+      if (dupe) {
+        throw new ApiError(HttpStatus.CONFLICT, "ROOM_EXISTS", `${dto.number} already exists`);
+      }
+    }
+
+    const hostel = await this.prisma.hostel.findFirst({ where: { orgId: user.orgId } });
+    let wingId: string | null | undefined;
+    if (dto.wingId !== undefined) {
+      wingId = dto.wingId ? await this.resolveWingId(user.orgId, hostel!.id, dto.wingId) : null;
+    }
+
+    const updated = await this.prisma.room.update({
+      where: { id: room.id },
+      data: {
+        ...(dto.number ? { number: dto.number } : {}),
+        ...(dto.floor != null ? { floor: dto.floor } : {}),
+        ...(wingId !== undefined ? { wingId } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes || null } : {}),
+      },
+      include: ROOM_INCLUDE,
+    });
+
+    await this.audit.log(user, {
+      action: "updated_room",
+      entityType: "room",
+      entityId: room.id,
+      entityLabel: updated.number,
+    });
+    return toRoomDto(updated);
   }
 
   /**

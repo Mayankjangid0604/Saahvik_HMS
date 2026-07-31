@@ -8,6 +8,7 @@ import {
 } from "react";
 import type { AuthSession, Org, User } from "@/api/types";
 import { ORG_KEY, TOKEN_KEY, USER_KEY } from "@/api/client";
+import { logoutServer } from "@/api/auth.api";
 
 interface AuthContextValue {
   token: string | null;
@@ -25,7 +26,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 function readJSON<T>(key: string): T | null {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = sessionStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : null;
   } catch {
     return null;
@@ -33,35 +34,36 @@ function readJSON<T>(key: string): T | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState<string | null>(() => sessionStorage.getItem(TOKEN_KEY));
   const [user, setUser] = useState<User | null>(() => readJSON<User>(USER_KEY));
   const [org, setOrg] = useState<Org | null>(() => readJSON<Org>(ORG_KEY));
 
   const login = useCallback((session: AuthSession) => {
-    localStorage.setItem(TOKEN_KEY, session.token);
-    localStorage.setItem(USER_KEY, JSON.stringify(session.user));
-    localStorage.setItem(ORG_KEY, JSON.stringify(session.org));
+    sessionStorage.setItem(TOKEN_KEY, session.token);
+    sessionStorage.setItem(USER_KEY, JSON.stringify(session.user));
+    sessionStorage.setItem(ORG_KEY, JSON.stringify(session.org));
     setToken(session.token);
     setUser(session.user);
     setOrg(session.org);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(ORG_KEY);
+    logoutServer().catch(() => {});
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(ORG_KEY);
     setToken(null);
     setUser(null);
     setOrg(null);
   }, []);
 
   const updateUser = useCallback((u: User) => {
-    localStorage.setItem(USER_KEY, JSON.stringify(u));
+    sessionStorage.setItem(USER_KEY, JSON.stringify(u));
     setUser(u);
   }, []);
 
   const updateOrg = useCallback((o: Org) => {
-    localStorage.setItem(ORG_KEY, JSON.stringify(o));
+    sessionStorage.setItem(ORG_KEY, JSON.stringify(o));
     setOrg(o);
   }, []);
 

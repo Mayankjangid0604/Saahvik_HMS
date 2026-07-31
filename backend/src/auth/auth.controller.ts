@@ -67,6 +67,11 @@ export class AuthController {
     return this.auth.resetPassword(dto.token, dto.newPassword);
   }
 
+  @Post("logout")
+  logout(@CurrentUser() user: AuthUser) {
+    return this.auth.logout(user);
+  }
+
   @Post("change-password")
   changePassword(@CurrentUser() user: AuthUser, @ValidatedBody(ChangePasswordDto) dto: ChangePasswordDto) {
     return this.auth.changePassword(user, dto);

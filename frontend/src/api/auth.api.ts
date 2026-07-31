@@ -59,7 +59,7 @@ export async function changePassword(input: {
   // Password change bumps tokenVersion server-side; the old JWT is revoked
   // and the response carries a fresh one — swap it in or the next request 401s.
   if (data.token) {
-    localStorage.setItem(TOKEN_KEY, data.token);
+    sessionStorage.setItem(TOKEN_KEY, data.token);
   }
   return data;
 }
@@ -92,6 +92,10 @@ export async function disableTwoFactor(code: string): Promise<{ enabled: boolean
     token: code,
   });
   return data;
+}
+
+export async function logoutServer(): Promise<void> {
+  await apiClient.post("/auth/logout");
 }
 
 export async function updateProfile(input: { name: string; phone: string }): Promise<User> {

@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { FormField } from "@/components/ui/FormField";
 import { useToast } from "@/components/ui/Toast";
-import { rupeesToPaisa } from "@/lib/format";
 import { ROOM_TYPE_OPTIONS, roomCapacityFor } from "./AddRoomDialog";
 
 const schema = z
@@ -22,15 +21,10 @@ const schema = z
     type: z.enum(["single", "double", "triple", "quad", "dorm"]),
     dormBeds: z.coerce.number().optional(),
     wingId: z.string().optional(),
-    fixedFee: z.boolean(),
-    feeRupees: z.coerce.number().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.type === "dorm" && (!v.dormBeds || v.dormBeds < 1 || v.dormBeds > 24)) {
       ctx.addIssue({ code: "custom", path: ["dormBeds"], message: "Enter 1–24 beds" });
-    }
-    if (v.fixedFee && (!v.feeRupees || v.feeRupees <= 0)) {
-      ctx.addIssue({ code: "custom", path: ["feeRupees"], message: "Enter the room fee" });
     }
   });
 type FormInput = z.input<typeof schema>;
@@ -44,24 +38,22 @@ export function BulkAddDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
     register,
     handleSubmit,
     watch,
-    setValue,
     reset,
     formState: { errors },
   } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
+    mode: "onBlur",
     defaultValues: {
       floor: 4,
       startNumber: 401,
       count: 6,
       type: "double",
       dormBeds: 4,
-      fixedFee: false,
       wingId: "",
     },
   });
 
   const type = watch("type") as RoomType;
-  const fixedFee = !!watch("fixedFee");
   const startNumber = Number(watch("startNumber"));
   const count = Number(watch("count"));
   const { data: wings = [] } = useQuery({ queryKey: ["wings"], queryFn: listWings });
@@ -74,8 +66,8 @@ export function BulkAddDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
         count: v.count,
         type: v.type,
         capacity: roomCapacityFor(v.type, v.dormBeds),
-        feeMode: v.fixedFee ? "fixed" : "variable",
-        fixedFeeAmountPaisa: v.fixedFee ? rupeesToPaisa(v.feeRupees ?? 0) : null,
+        feeMode: "variable",
+        fixedFeeAmountPaisa: null,
         wingId: v.wingId || undefined,
       }),
     onSuccess: ({ created }) => {
@@ -134,26 +126,9 @@ export function BulkAddDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
           </Select>
         </FormField>
 
-        <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-slate-200 px-3 py-2.5">
-          <input
-            type="checkbox"
-            className="mt-0.5 accent-accent"
-            checked={fixedFee}
-            onChange={(e) => setValue("fixedFee", e.target.checked)}
-          />
-          <span>
-            <span className="block text-sm font-medium text-ink">Fixed Room Fee</span>
-            <span className="block text-xs text-muted">
-              Applies to every room created — residents pay the room's fee, not a per-resident one.
-            </span>
-          </span>
-        </label>
-
-        {fixedFee && (
-          <FormField label="Room Fee (₹/month)" error={errors.feeRupees?.message} required>
-            <Input type="number" min={0} step="100" placeholder="5500" error={!!errors.feeRupees} {...register("feeRupees")} />
-          </FormField>
-        )}
+        <p className="rounded bg-slate-50 px-3 py-2 text-xs text-muted">
+          To set a fixed room fee, use Fee Settings on each room after creation.
+        </p>
 
         {startNumber > 0 && count > 0 && (
           <p className="rounded bg-accent-50 px-3 py-2 text-xs text-accent-600">

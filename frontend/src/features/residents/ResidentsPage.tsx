@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
-import { Search, UserPlus } from "lucide-react";
+import { FileText, Search, Trash2, UserPlus } from "lucide-react";
 import { listResidents } from "@/api/resident.api";
 import type { Resident } from "@/api/types";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -16,14 +16,61 @@ import { MoneyDisplay } from "@/components/shared/MoneyDisplay";
 import { DateDisplay } from "@/components/shared/DateDisplay";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePagination } from "@/hooks/usePagination";
+import { getDrafts, deleteDraft } from "./draft-store";
+
+function DraftsPanel({ onUpdate }: { onUpdate: () => void }) {
+  const navigate = useNavigate();
+  const drafts = getDrafts();
+  if (drafts.length === 0) return null;
+
+  return (
+    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+      <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-amber-800">
+        <FileText className="h-3.5 w-3.5" /> Saved drafts ({drafts.length})
+      </h3>
+      <div className="space-y-1.5">
+        {drafts.map((d) => (
+          <div key={d.id} className="flex items-center justify-between rounded bg-white px-3 py-1.5 text-sm">
+            <button
+              className="font-medium text-accent-600 hover:underline"
+              onClick={() => navigate(`/residents/new?draft=${d.id}`)}
+            >
+              {d.name}
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted">
+                {new Date(d.savedAt).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+              <button
+                className="text-muted hover:text-red-600"
+                onClick={() => {
+                  deleteDraft(d.id);
+                  onUpdate();
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function ResidentsPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState("active");
   const [sorting, setSorting] = useState<SortingState>([{ id: "name", desc: false }]);
   const { page, pageSize, setPage, setPageSize } = usePagination();
   const debouncedSearch = useDebounce(search);
+  const [draftKey, setDraftKey] = useState(0);
 
   const { data, isLoading } = useQuery({
     queryKey: ["residents", "list", { page, pageSize, debouncedSearch, status, sorting }],
@@ -103,6 +150,8 @@ export function ResidentsPage() {
         }
       />
 
+      <DraftsPanel key={draftKey} onUpdate={() => setDraftKey((k) => k + 1)} />
+
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative w-full sm:w-64">
           <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-slate-400" />
@@ -124,9 +173,9 @@ export function ResidentsPage() {
             setPage(1);
           }}
           options={[
-            { value: "all", label: "All statuses" },
             { value: "active", label: "Active" },
-            { value: "notice", label: "On notice" },
+            { value: "all", label: "All statuses" },
+            { value: "alumni", label: "Alumni" },
           ]}
         />
         <Link to="/residents/import" className="ml-auto text-xs font-medium text-accent-600 hover:underline">

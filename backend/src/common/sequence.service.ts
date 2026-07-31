@@ -52,4 +52,9 @@ export class SequenceService {
   formatTicketNo(seq: number): string {
     return `CMP-${String(seq).padStart(4, "0")}`;
   }
+
+  formatFormNo(hostelId: string, year: number, seq: number): string {
+    const shortId = hostelId.slice(0, 6).toUpperCase();
+    return `${shortId}_${year}_${String(seq).padStart(4, "0")}`;
+  }
 }

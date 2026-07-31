@@ -7,6 +7,7 @@ import type {
   Paginated,
   Room,
   RoomTransferInput,
+  UpdateRoomInput,
   UpdateRoomFeeInput,
 } from "./types";
 import { apiClient } from "./client";
@@ -49,6 +50,11 @@ export async function bulkAddRooms(input: BulkAddRoomsInput): Promise<{ created:
 
 export async function transferResident(input: RoomTransferInput): Promise<{ ok: boolean }> {
   const { data } = await apiClient.post<{ ok: boolean }>("/rooms/transfer", input);
+  return data;
+}
+
+export async function updateRoom(roomId: string, input: UpdateRoomInput): Promise<Room> {
+  const { data } = await apiClient.put<Room>(`/rooms/${roomId}`, input);
   return data;
 }
 

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
-import { ArrowLeftRight, BedDouble, Layers, Plus, Search, Settings2 } from "lucide-react";
+import { ArrowLeftRight, BedDouble, Layers, Pencil, Plus, Search, Settings2 } from "lucide-react";
 import { listAllRooms, listRooms } from "@/api/hostel.api";
 import type { Room } from "@/api/types";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -19,6 +19,7 @@ import { AddRoomDialog } from "./AddRoomDialog";
 import { BulkAddDialog } from "./BulkAddDialog";
 import { RoomTransferDialog } from "./RoomTransferDialog";
 import { RoomFeeDialog } from "./RoomFeeDialog";
+import { EditRoomDialog } from "./EditRoomDialog";
 
 const typeLabels: Record<Room["type"], string> = {
   single: "Single",
@@ -42,6 +43,7 @@ export function RoomsPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [feeRoom, setFeeRoom] = useState<Room | null>(null);
+  const [editRoom, setEditRoom] = useState<Room | null>(null);
 
   // Filter options come from the rooms that actually exist (Change 4)
   const { data: allRooms } = useQuery({ queryKey: ["rooms", "all"], queryFn: listAllRooms });
@@ -211,6 +213,15 @@ export function RoomsPage() {
               className="flex min-w-40 items-center gap-2 rounded-md border border-dashed border-slate-300 bg-white px-3 py-2 text-xs font-medium text-muted hover:border-accent hover:text-accent-600"
               onClick={(e) => {
                 e.stopPropagation();
+                setEditRoom(row.original);
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5" /> Edit room
+            </button>
+            <button
+              className="flex min-w-40 items-center gap-2 rounded-md border border-dashed border-slate-300 bg-white px-3 py-2 text-xs font-medium text-muted hover:border-accent hover:text-accent-600"
+              onClick={(e) => {
+                e.stopPropagation();
                 setFeeRoom(row.original);
               }}
             >
@@ -253,6 +264,7 @@ export function RoomsPage() {
       />
       <BulkAddDialog isOpen={bulkOpen} onClose={() => setBulkOpen(false)} />
       <RoomTransferDialog isOpen={transferOpen} onClose={() => setTransferOpen(false)} />
+      <EditRoomDialog room={editRoom} onClose={() => setEditRoom(null)} />
       <RoomFeeDialog room={feeRoom} onClose={() => setFeeRoom(null)} />
     </div>
   );
