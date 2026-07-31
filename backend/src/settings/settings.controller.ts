@@ -1,19 +1,35 @@
-import { Body, Controller, Get, Inject, Post, Put } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Post,
+  Put,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { AdmissionFieldType } from "@prisma/client";
 import { Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsHexColor,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Max,
+  Min,
   ValidateNested,
 } from "class-validator";
+import { ApiError } from "../common/api-error";
 import type { AuthUser } from "../common/auth-user";
 import { CurrentUser, Roles } from "../common/decorators";
 import { ValidatedBody, ValidatedQuery } from "../common/validated";
+import { FilesService, MAX_FILE_SIZE_BYTES } from "../files/files.service";
 import { SettingsService } from "./settings.service";
 
 class UpdateOrgDto {
@@ -26,6 +42,13 @@ class UpdateOrgDto {
   @IsOptional() @IsString() phone?: string;
   @IsOptional() @IsString() email?: string;
   @IsOptional() @IsString() gstin?: string;
+  // GST config (feature 8).
+  @IsOptional() @IsBoolean() gstEnabled?: boolean;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(28) gstRatePercent?: number;
+  @IsOptional() @IsBoolean() gstInclusive?: boolean;
+  // Brand theme colors (feature 17).
+  @IsOptional() @IsHexColor() themeColorPrimary?: string;
+  @IsOptional() @IsHexColor() themeColorAccent?: string;
   @IsOptional() @IsBoolean() setupComplete?: boolean;
 }
 
@@ -81,7 +104,10 @@ class NotificationPreferencesDto {
 
 @Controller("settings")
 export class SettingsController {
-  constructor(@Inject(SettingsService) private readonly settings: SettingsService) {}
+  constructor(
+    @Inject(SettingsService) private readonly settings: SettingsService,
+    @Inject(FilesService) private readonly files: FilesService,
+  ) {}
 
   @Get("org")
   getOrg(@CurrentUser() user: AuthUser) {
@@ -92,6 +118,16 @@ export class SettingsController {
   @Roles("owner")
   updateOrg(@CurrentUser() user: AuthUser, @ValidatedBody(UpdateOrgDto) dto: UpdateOrgDto) {
     return this.settings.updateOrg(user, dto);
+  }
+
+  /** Upload the org logo for PDF/receipt + UI branding (feature 17). Owner only. */
+  @Post("org/logo")
+  @Roles("owner")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_FILE_SIZE_BYTES } }))
+  async uploadLogo(@CurrentUser() user: AuthUser, @UploadedFile() file?: Express.Multer.File) {
+    if (!file) throw ApiError.badRequest("No file provided");
+    const { key } = await this.files.store(user, file);
+    return this.settings.setLogo(user, key);
   }
 
   /** Billing/subscription is owner only (access matrix). */

@@ -45,6 +45,13 @@ export function toOrgDto(org: Organization) {
     phone: org.phone ?? "",
     email: org.email ?? "",
     gstin: org.gstin ?? undefined,
+    // GST config (feature 8) and branding (feature 17).
+    gstEnabled: org.gstEnabled,
+    gstRatePercent: org.gstRatePercent,
+    gstInclusive: org.gstInclusive,
+    logoUrl: org.logoKey ? `/api/v1/files/${org.logoKey}` : undefined,
+    themeColorPrimary: org.themeColorPrimary ?? undefined,
+    themeColorAccent: org.themeColorAccent ?? undefined,
     plan: org.plan,
     setupComplete: org.onboardingCompleted,
   };

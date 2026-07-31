@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { ApiError } from "../common/api-error";
 import type { AuthUser } from "../common/auth-user";
+import { computeGst } from "../common/gst";
 import { pageArgs, paginated, type Paginated } from "../common/pagination";
 import { SequenceService } from "../common/sequence.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -95,7 +96,17 @@ export class InvoicesService {
       include: INVOICE_INCLUDE,
     });
     if (!inv) throw ApiError.notFound("Invoice");
-    return toInvoiceDto(inv);
+    // GST breakdown (feature 8) on the invoice total — same computeGst helper
+    // the receipt PDF uses, so the two never diverge. Present on the detail
+    // view; null when the org hasn't enabled GST.
+    const org = await this.prisma.organization.findUniqueOrThrow({ where: { id: user.orgId } });
+    const gst = computeGst(inv.amountPaisa, {
+      gstEnabled: org.gstEnabled,
+      gstRatePercent: org.gstRatePercent,
+      gstInclusive: org.gstInclusive,
+      gstin: org.gstin,
+    });
+    return { ...toInvoiceDto(inv), gst: gst.enabled ? gst : undefined };
   }
 
   /**
