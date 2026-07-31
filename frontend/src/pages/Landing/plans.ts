@@ -399,3 +399,104 @@ export const ADDON_GROUPS: readonly AddonGroup[] = [
     ],
   },
 ];
+
+/**
+ * Plain-language explanations for plan features, aimed at non-IT hostel owners.
+ * Keyed by the exact feature string used in PLANS[].features and PLANS[].limits.
+ */
+export const FEATURE_EXPLANATIONS: Record<string, string> = {
+  // Basic
+  "Rooms, beds & bed-level occupancy dashboard":
+    "See exactly which beds are empty and which are taken, on one screen. Helps you fill vacancies faster.",
+  "Fee collection with PDF receipts, dues tracking & automated reminders":
+    "Collect rent, print receipts, and the system automatically reminds students who haven't paid.",
+  "Partial payments, refunds, late fees, discounts & security deposits":
+    "Accept part payment, charge late fees, apply discounts, and manage security deposits — all tracked automatically.",
+  "Expense tracking & invoice generation":
+    "Record hostel expenses (maintenance, electricity, supplies) and generate bills for residents.",
+  "Complaint logging with photos, assignment & status tracking":
+    "Students can submit complaints with photos. You assign them to staff and track until resolved.",
+  "4 standard reports (occupancy, dues, residents, collections) as PDF":
+    "Download ready-made reports on occupancy, pending payments, and collections as PDF files.",
+  "Admission form customization & bulk fee assignment":
+    "Design your own admission form fields and set fees for many students at once.",
+  "Guardian logins — one login covers multiple residents":
+    "Parents/guardians get their own login to check their child's fees and status.",
+  "2FA, login audit trail & automated daily backups":
+    "Extra login security with OTP, a log of who logged in when, and automatic daily data backups.",
+  "Email support & self-serve onboarding":
+    "Get help via email and use guided setup to configure your hostel yourself.",
+  // Beginner
+  "Resident self-service logins":
+    "Students can log in themselves to see their fees, receipts, and room details.",
+  "WhatsApp & SMS notifications with announcement broadcasts":
+    "Send fee reminders and announcements directly to students via WhatsApp and SMS.",
+  "Online fee collection from residents via Razorpay":
+    "Students can pay fees online using UPI, cards, or net banking. Money goes to your bank account.",
+  "Visitor management with pre-approval & resident alerts":
+    "Track who visits the hostel. Residents get alerted when their visitor arrives.",
+  "Resident attendance, curfew tracking & leave workflows":
+    "Mark daily attendance, enforce curfew timings, and manage leave requests from students.",
+  "Parcel register with pickup confirmation":
+    "Log incoming parcels and notify the student. They confirm when they pick it up.",
+  "Staff attendance, leave & shift scheduling":
+    "Track your staff's attendance, manage their leaves, and schedule shifts.",
+  "Operations mobile app for staff, with push notifications":
+    "Your staff get a mobile app for their daily tasks — room checks, complaints, visitor logs.",
+  "GST configuration, vendor management & purchase records":
+    "Set up GST for billing, manage your suppliers, and track purchases.",
+  "Excel exports, report scheduling & role-based dashboards":
+    "Download data as Excel, schedule reports to email automatically, and give each staff role its own dashboard.",
+  "Dynamic form builder, sandbox environment & custom branding":
+    "Build custom forms, test changes in a safe sandbox, and add your hostel's logo and colors.",
+  "Chat support + call support for major issues":
+    "Get help via chat anytime, and phone support for urgent problems.",
+  // Professional
+  "Multi-building hierarchy with per-building floors":
+    "Manage multiple buildings (boys hostel, girls hostel, etc.) each with their own floor structure.",
+  "Custom role creation, delegation & multi-level approvals":
+    "Create custom staff roles (e.g. floor warden, accountant) with different permissions and approval chains.",
+  "Double-entry accounting ledger, bank reconciliation & budgeting":
+    "Full accounting system — reconcile with your bank statement and set budgets.",
+  "Petty cash management":
+    "Track small daily cash expenses (chai, repairs, stationery) with proper records.",
+  "No-code workflow builder & business rules engine":
+    "Set up automatic rules like 'if rent is 15 days late, send reminder' — no coding needed.",
+  "Custom report builder & advanced analytics dashboards":
+    "Create your own reports and see trends and analytics on visual dashboards.",
+  "Resident mobile app":
+    "Students get their own mobile app to pay fees, submit complaints, and check notices.",
+  "AI assistant, AI-drafted communication & report narrator":
+    "AI helps draft messages to parents, explains reports in simple language, and answers your questions.",
+  "SSO (Google / Microsoft) & device trust":
+    "Staff and residents can sign in with their Google or Microsoft accounts. Trusted devices skip OTP.",
+  "Public REST API, webhooks & accounting integrations (Tally, Zoho, QuickBooks)":
+    "Connect with Tally, Zoho, or QuickBooks so your accountant sees hostel data in their own software.",
+  "Occupancy forecasting, floor plan upload & visitor QR passes":
+    "Predict future vacancies, upload your floor plans, and give visitors QR-code entry passes.",
+  "Full audit trail & priority support on every issue":
+    "Complete log of every action taken in the system. Every support request gets priority handling.",
+  // Business
+  "True multi-property management with cross-property occupancy":
+    "Run multiple hostels from one account. See occupancy across all properties at a glance.",
+  "Cross-property analytics, benchmarking & executive dashboards":
+    "Compare performance across your hostels — which one collects faster, has lower vacancy, etc.",
+  "Data warehouse access & multi-language support":
+    "Access raw data for custom analysis. Interface available in multiple languages.",
+  "SAML / SCIM enterprise SSO, IP whitelisting & break-glass access":
+    "Enterprise-grade security — restrict logins to your office network, with emergency override access.",
+  "Full staff payroll (deductions, TDS, payslips) & multi-currency":
+    "Run complete payroll for your hostel staff including tax deductions and payslip generation.",
+  "AI occupancy forecasting, dues prediction & complaint classification":
+    "AI predicts which students might leave, who's likely to default on fees, and sorts complaints automatically.",
+  "Full white-label (app + website) & custom domain — bundled":
+    "Your hostel's own branded app and website (yourhostel.com) — included in the plan.",
+  "Customer-owned notification providers & self-hosted storage":
+    "Use your own SMS/WhatsApp provider and storage server for full data control.",
+  "Biometric / smart lock & government compliance integrations":
+    "Connect fingerprint scanners or smart locks. Auto-generate reports required by local authorities.",
+  "Point-in-time recovery, self-service restore & compliance reports":
+    "Restore your data to any point in time if something goes wrong. Generate compliance reports.",
+  "Dedicated account manager, 24×7 support, SLA guarantee & training":
+    "Your own account manager, round-the-clock support with guaranteed response times, plus staff training.",
+};

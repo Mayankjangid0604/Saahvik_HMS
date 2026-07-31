@@ -785,6 +785,31 @@
   background-color: var(--gold);
 }
 
+.pricing-features li.has-tip {
+  cursor: help;
+}
+
+.feature-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background-color: var(--sapphire-100, #e0e7ff);
+  color: var(--sapphire, #3b5ec9);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.pricing-features li.has-tip:hover .feature-info {
+  background-color: var(--sapphire, #3b5ec9);
+  color: #fff;
+}
+
 /* Enterprise band */
 
 .enterprise-band {

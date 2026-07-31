@@ -500,6 +500,7 @@ export class ResidentsService {
             roomId,
             joinDate: row.joinDate ? new Date(row.joinDate) : new Date(),
             monthlyFeePaisa: feePaisa,
+            admissionData: row.admissionData as Prisma.InputJsonValue ?? Prisma.JsonNull,
           },
         });
         if (bedId) {

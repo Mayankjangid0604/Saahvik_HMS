@@ -308,6 +308,7 @@ export function AddResidentPage() {
                   <FileUpload
                     label={`Upload ${f.label.toLowerCase()}`}
                     accept={f.key === "photo" ? ".jpg,.jpeg,.png" : ".jpg,.jpeg,.png,.pdf,.doc,.docx"}
+                    capture={f.key === "photo" ? "environment" : undefined}
                     value={files[f.key] ?? []}
                     onChange={(next) => setFiles((prev) => ({ ...prev, [f.key]: next }))}
                   />

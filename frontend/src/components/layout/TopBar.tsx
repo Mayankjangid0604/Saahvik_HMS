@@ -15,6 +15,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { Dropdown, DropdownItem, DropdownSeparator } from "@/components/ui/Dropdown";
 import { getUnreadCount } from "@/api/notification.api";
+import { useNotificationSSE } from "@/hooks/useNotificationSSE";
 import { resolveBreadcrumbLabel } from "./breadcrumb";
 import { Clock } from "./Clock";
 import { ThemeToggle } from "./ThemeToggle";
@@ -32,6 +33,8 @@ export function TopBar({
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const pageLabel = resolveBreadcrumbLabel(pathname);
+
+  useNotificationSSE();
 
   const { data: unread = 0 } = useQuery({
     queryKey: ["notifications", "unread-count"],
