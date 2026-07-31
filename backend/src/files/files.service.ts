@@ -52,6 +52,20 @@ export class FilesService {
     return { key, url: fileUrl(key) };
   }
 
+  /**
+   * Persist a server-generated buffer under an org (feature 16 — the report
+   * scheduler stores generated PDFs/XLSX outside any HTTP request, so there is
+   * no Multer file or AuthUser). Returns the storage key, prefixed with the org
+   * like every other upload so the authenticated /files endpoint can serve it.
+   */
+  async storeBuffer(orgId: string, buffer: Buffer, ext: string): Promise<{ key: string }> {
+    const safeExt = ext.startsWith(".") ? ext : `.${ext}`;
+    const key = `${orgId}/${randomUUID()}${safeExt}`;
+    await mkdir(join(this.uploadsRoot, orgId), { recursive: true });
+    await writeFile(join(this.uploadsRoot, key), buffer);
+    return { key };
+  }
+
   /** Open a stored file for streaming — only if it belongs to the caller's org. */
   async open(user: AuthUser, key: string) {
     // The org prefix is the tenancy boundary; the JWT's orgId must match it.

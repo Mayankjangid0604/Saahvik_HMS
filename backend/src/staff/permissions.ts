@@ -4,7 +4,12 @@
  * `permissions` array. Adding a new capability is a one-line change here plus a
  * human-readable label on the frontend (STAFF_PERMISSION_LABELS).
  */
-export const STAFF_PERMISSIONS = ["manageExpenses"] as const;
+// "manageExpenses" — record/manage expenses + see profit & expense breakdowns.
+// "viewFinancials" — see money on the dashboard (collections, dues, advances)
+//   without necessarily managing expenses. Drives role-based dashboards
+//   (feature 15): a staff member without either permission sees the operational
+//   dashboard (occupancy, complaints) but no financial figures. Owners hold all.
+export const STAFF_PERMISSIONS = ["manageExpenses", "viewFinancials"] as const;
 
 export type StaffPermission = (typeof STAFF_PERMISSIONS)[number];
 

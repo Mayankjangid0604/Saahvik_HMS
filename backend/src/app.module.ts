@@ -24,6 +24,7 @@ import { SearchModule } from "./search/search.module";
 import { SettingsModule } from "./settings/settings.module";
 import { StaffModule } from "./staff/staff.module";
 import { VendorsModule } from "./vendors/vendors.module";
+import { XlsxModule } from "./xlsx/xlsx.module";
 import { HealthController } from "./health.controller";
 
 @Module({
@@ -38,6 +39,7 @@ import { HealthController } from "./health.controller";
     ScheduleModule.forRoot(),
     PrismaModule,
     PdfModule,
+    XlsxModule,
     AuditModule,
     AuthModule,
     SettingsModule,
