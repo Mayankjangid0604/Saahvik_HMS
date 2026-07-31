@@ -206,6 +206,9 @@ export class BulkImportRowDto {
   @IsOptional()
   @IsString()
   joinDate?: string;
+
+  @IsOptional()
+  admissionData?: Record<string, string>;
 }
 
 export class BulkImportDto {

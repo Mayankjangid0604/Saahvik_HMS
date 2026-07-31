@@ -1,9 +1,13 @@
-import { Controller, Get, Inject, Param, Put, Query } from "@nestjs/common";
+import { Controller, Get, Inject, Param, Put, Query, Req, Sse, UnauthorizedException } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
 import { Type } from "class-transformer";
 import { IsBoolean, IsInt, IsOptional, Min } from "class-validator";
-import type { AuthUser } from "../common/auth-user";
-import { CurrentUser } from "../common/decorators";
-import { ValidatedBody, ValidatedQuery } from "../common/validated";
+import type { Request } from "express";
+import { Observable, merge, map, finalize, interval, startWith } from "rxjs";
+import type { AuthUser, JwtPayload } from "../common/auth-user";
+import { CurrentUser, Public } from "../common/decorators";
+import { ValidatedQuery } from "../common/validated";
+import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "./notifications.service";
 
 class NotificationListDto {
@@ -30,6 +34,8 @@ class NotificationListDto {
 export class NotificationsController {
   constructor(
     @Inject(NotificationsService) private readonly notifications: NotificationsService,
+    @Inject(JwtService) private readonly jwt: JwtService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
 
   @Get()
@@ -50,5 +56,55 @@ export class NotificationsController {
   @Put(":id/read")
   markRead(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.notifications.markRead(user, id);
+  }
+
+  /**
+   * SSE stream. EventSource can't send Authorization headers,
+   * so the token is passed as ?token=<jwt>.
+   */
+  @Public()
+  @Sse("stream")
+  async stream(@Query("token") token: string, @Req() req: Request): Promise<Observable<MessageEvent>> {
+    if (!token) throw new UnauthorizedException("Missing token");
+
+    let payload: JwtPayload;
+    try {
+      payload = await this.jwt.verifyAsync<JwtPayload>(token);
+    } catch {
+      throw new UnauthorizedException("Invalid or expired token");
+    }
+
+    if (payload.role === "owner") {
+      const owner = await this.prisma.owner.findUnique({
+        where: { id: payload.sub },
+        select: { tokenVersion: true },
+      });
+      if (!owner || owner.tokenVersion !== (payload.tv ?? 0)) {
+        throw new UnauthorizedException("Token has been revoked");
+      }
+    }
+
+    const user: AuthUser = {
+      userId: payload.sub,
+      orgId: payload.orgId,
+      role: payload.role,
+      staffRole: payload.staffRole,
+      name: payload.name,
+    };
+
+    const stream = this.notifications.getStream(user);
+
+    const heartbeat$ = interval(30_000).pipe(
+      startWith(0),
+      map(() => ({ data: JSON.stringify({ type: "heartbeat" }) }) as MessageEvent),
+    );
+
+    const events$ = stream.pipe(
+      map((p) => ({ data: JSON.stringify({ type: "notification", ...p }) }) as MessageEvent),
+    );
+
+    return merge(heartbeat$, events$).pipe(
+      finalize(() => this.notifications.removeStream(user)),
+    );
   }
 }

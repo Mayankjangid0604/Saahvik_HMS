@@ -7,6 +7,7 @@ import {
   BILLING_CYCLES,
   COMPARISON,
   ENTERPRISE,
+  FEATURE_EXPLANATIONS,
   PLANS,
 } from "./plans";
 import type { CycleId } from "./plans";
@@ -446,9 +447,15 @@ export function LandingPage() {
                         {plan.inheritsLabel ?? "Includes"}
                       </p>
                       <ul>
-                        {plan.features.map((feature) => (
-                          <li key={feature}>{feature}</li>
-                        ))}
+                        {plan.features.map((feature) => {
+                          const tip = FEATURE_EXPLANATIONS[feature];
+                          return (
+                            <li key={feature} title={tip} className={tip ? "has-tip" : ""}>
+                              {feature}
+                              {tip && <span className="feature-info" aria-label="More info">?</span>}
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   </article>

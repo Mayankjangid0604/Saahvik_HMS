@@ -291,6 +291,7 @@ export interface BulkImportRow {
   bedLabel: string;
   monthlyFeeRupees: number;
   joinDate: string;
+  admissionData?: Record<string, string>;
 }
 
 export interface BulkImportResult {

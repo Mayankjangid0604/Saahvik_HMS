@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { NotificationKind } from "@prisma/client";
+import { Subject } from "rxjs";
 import type { AuthUser } from "../common/auth-user";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -14,9 +15,37 @@ interface NotifyEvent {
   excludeUserId?: string;
 }
 
+export interface SsePayload {
+  title: string;
+  body: string;
+  link?: string;
+}
+
 @Injectable()
 export class NotificationsService {
+  private readonly sseStreams = new Map<string, Subject<SsePayload>>();
+
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+
+  /** Get or create a per-user SSE subject keyed by `role:userId`. */
+  getStream(user: AuthUser): Subject<SsePayload> {
+    const key = `${user.role}:${user.userId}`;
+    let subj = this.sseStreams.get(key);
+    if (!subj) {
+      subj = new Subject<SsePayload>();
+      this.sseStreams.set(key, subj);
+    }
+    return subj;
+  }
+
+  removeStream(user: AuthUser): void {
+    const key = `${user.role}:${user.userId}`;
+    const subj = this.sseStreams.get(key);
+    if (subj) {
+      subj.complete();
+      this.sseStreams.delete(key);
+    }
+  }
 
   /**
    * Fan a notification out to every login of the org (owners + active staff),
@@ -57,6 +86,15 @@ export class NotificationsService {
         link: event.link,
       })),
     });
+
+    // Push to any connected SSE clients
+    for (const r of rows) {
+      const key = `${r.userType}:${r.userId}`;
+      const subj = this.sseStreams.get(key);
+      if (subj) {
+        subj.next({ title: event.title, body: event.body, link: event.link });
+      }
+    }
   }
 
   async list(user: AuthUser, params: { page?: number; pageSize?: number; onlyUnread?: boolean }) {

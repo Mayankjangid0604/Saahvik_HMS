@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { FileText, Upload, X } from "lucide-react";
+import { Camera, FileText, Upload, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 export interface UploadedFile {
@@ -15,6 +15,7 @@ export function FileUpload({
   label = "Upload file",
   accept = ".jpg,.jpeg,.png,.pdf,.doc,.docx",
   multiple = false,
+  capture,
   value,
   onChange,
   className,
@@ -22,11 +23,13 @@ export function FileUpload({
   label?: string;
   accept?: string;
   multiple?: boolean;
+  capture?: "environment" | "user";
   value: UploadedFile[];
   onChange: (files: UploadedFile[]) => void;
   className?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
   const addFiles = (list: FileList | null) => {
@@ -70,6 +73,15 @@ export function FileUpload({
           Click or drag — {accept.replace(/\./g, "").replace(/,/g, ", ")}
         </span>
       </button>
+      {capture && (
+        <button
+          type="button"
+          onClick={() => cameraRef.current?.click()}
+          className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-ink hover:bg-slate-50"
+        >
+          <Camera className="h-4 w-4 text-slate-500" /> Take photo
+        </button>
+      )}
       <input
         ref={inputRef}
         type="file"
@@ -81,6 +93,19 @@ export function FileUpload({
           e.target.value = "";
         }}
       />
+      {capture && (
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture={capture}
+          className="hidden"
+          onChange={(e) => {
+            addFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      )}
       {value.length > 0 && (
         <ul className="mt-2 space-y-1.5">
           {value.map((f, i) => (

@@ -146,6 +146,30 @@ export class ResidentsService {
     await this.validateAdmission(user.orgId, dto.admissionData);
 
     const resident = await this.prisma.$transaction(async (tx) => {
+      // #12 — Prevent duplicate residents within the same org
+      const dupeByPhone = await tx.resident.findFirst({
+        where: { orgId: user.orgId, phone: dto.phone, status: { not: "alumni" } },
+      });
+      if (dupeByPhone) {
+        throw new ApiError(
+          HttpStatus.CONFLICT,
+          "DUPLICATE_PHONE",
+          `A resident with phone ${dto.phone} already exists (${dupeByPhone.name})`,
+        );
+      }
+      if (dto.idNumber) {
+        const dupeByAadhaar = await tx.resident.findFirst({
+          where: { orgId: user.orgId, idNumber: dto.idNumber, status: { not: "alumni" } },
+        });
+        if (dupeByAadhaar) {
+          throw new ApiError(
+            HttpStatus.CONFLICT,
+            "DUPLICATE_ID",
+            `A resident with this ID number already exists (${dupeByAadhaar.name})`,
+          );
+        }
+      }
+
       let monthlyFeePaisa = dto.monthlyFeePaisa ?? 0;
       let bedToOccupy: string | null = null;
 
@@ -155,6 +179,17 @@ export class ResidentsService {
           include: { beds: true },
         });
         if (!room) throw ApiError.notFound("Room");
+
+        // #13 — Explicit capacity check (defense-in-depth)
+        const occupiedCount = room.beds.filter((b) => b.status === "occupied").length;
+        if (occupiedCount >= room.capacity) {
+          throw new ApiError(
+            HttpStatus.CONFLICT,
+            "ROOM_FULL",
+            `${room.number} is at full capacity (${room.capacity} beds occupied)`,
+          );
+        }
+
         const bed = room.beds.find((b) => b.id === dto.bedId);
         if (!bed) throw ApiError.notFound("Selected bed");
         if (bed.status === "occupied") {
@@ -465,6 +500,7 @@ export class ResidentsService {
             roomId,
             joinDate: row.joinDate ? new Date(row.joinDate) : new Date(),
             monthlyFeePaisa: feePaisa,
+            admissionData: row.admissionData as Prisma.InputJsonValue ?? Prisma.JsonNull,
           },
         });
         if (bedId) {
