@@ -216,6 +216,13 @@ export interface UpdateWingInput {
   notes?: string;
 }
 
+export interface UpdateRoomInput {
+  number?: string;
+  floor?: number;
+  wingId?: string | null;
+  notes?: string;
+}
+
 export interface UpdateRoomFeeInput {
   feeMode: RoomFeeMode;
   fixedFeeAmountPaisa: number | null;

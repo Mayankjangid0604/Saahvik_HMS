@@ -12,7 +12,6 @@ import { Select } from "@/components/ui/Select";
 import { FormField } from "@/components/ui/FormField";
 import { useToast } from "@/components/ui/Toast";
 import { requiredString } from "@/lib/validators";
-import { rupeesToPaisa } from "@/lib/format";
 
 /** Room type implies bed count; only dormitories ask for a manual count. */
 export const ROOM_TYPE_CAPACITY: Record<Exclude<RoomType, "dorm">, number> = {
@@ -37,15 +36,10 @@ const schema = z
     type: z.enum(["single", "double", "triple", "quad", "dorm"]),
     dormBeds: z.coerce.number().optional(),
     wingId: z.string().optional(),
-    fixedFee: z.boolean(),
-    feeRupees: z.coerce.number().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.type === "dorm" && (!v.dormBeds || v.dormBeds < 1 || v.dormBeds > 24)) {
       ctx.addIssue({ code: "custom", path: ["dormBeds"], message: "Enter 1–24 beds" });
-    }
-    if (v.fixedFee && (!v.feeRupees || v.feeRupees <= 0)) {
-      ctx.addIssue({ code: "custom", path: ["feeRupees"], message: "Enter the room fee" });
     }
   });
 type FormInput = z.input<typeof schema>;
@@ -63,16 +57,15 @@ export function AddRoomDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
     register,
     handleSubmit,
     watch,
-    setValue,
     reset,
     formState: { errors },
   } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { type: "double", floor: 1, fixedFee: false, dormBeds: 4, wingId: "" },
+    mode: "onBlur",
+    defaultValues: { type: "double", floor: 1, dormBeds: 4, wingId: "" },
   });
 
   const type = watch("type") as RoomType;
-  const fixedFee = !!watch("fixedFee");
   const { data: wings = [] } = useQuery({ queryKey: ["wings"], queryFn: listWings });
 
   const mutation = useMutation({
@@ -82,8 +75,8 @@ export function AddRoomDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
         floor: v.floor,
         type: v.type,
         capacity: roomCapacityFor(v.type, v.dormBeds),
-        feeMode: v.fixedFee ? "fixed" : "variable",
-        fixedFeeAmountPaisa: v.fixedFee ? rupeesToPaisa(v.feeRupees ?? 0) : null,
+        feeMode: "variable",
+        fixedFeeAmountPaisa: null,
         wingId: v.wingId || undefined,
       }),
     onSuccess: (room) => {
@@ -136,27 +129,9 @@ export function AddRoomDialog({ isOpen, onClose }: { isOpen: boolean; onClose: (
           </Select>
         </FormField>
 
-        <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-slate-200 px-3 py-2.5">
-          <input
-            type="checkbox"
-            className="mt-0.5 accent-accent"
-            checked={fixedFee}
-            onChange={(e) => setValue("fixedFee", e.target.checked)}
-          />
-          <span>
-            <span className="block text-sm font-medium text-ink">Fixed Room Fee</span>
-            <span className="block text-xs text-muted">
-              Every resident in this room pays the same fee, set here. Off = fee entered per
-              resident.
-            </span>
-          </span>
-        </label>
-
-        {fixedFee && (
-          <FormField label="Room Fee (₹/month)" error={errors.feeRupees?.message} required>
-            <Input type="number" min={0} step="100" placeholder="5500" error={!!errors.feeRupees} {...register("feeRupees")} />
-          </FormField>
-        )}
+        <p className="rounded bg-slate-50 px-3 py-2 text-xs text-muted">
+          To set a fixed room fee, use Fee Settings after adding the room.
+        </p>
 
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="outline" onClick={onClose}>

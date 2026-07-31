@@ -94,6 +94,26 @@ export class BulkAddRoomsDto {
   wingId?: string;
 }
 
+export class UpdateRoomDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  number?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  floor?: number;
+
+  @IsOptional()
+  @IsString()
+  wingId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
 export class UpdateRoomFeeDto {
   @IsEnum(FeeMode)
   feeMode!: FeeMode;

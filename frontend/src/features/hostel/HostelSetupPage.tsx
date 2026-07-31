@@ -42,6 +42,7 @@ export function HostelSetupPage() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: "onBlur",
     defaultValues: {
       hostelName: org?.hostelName ?? "",
       addressLine: org?.addressLine ?? "",

@@ -17,6 +17,7 @@ import {
   CreateRoomDto,
   RoomListParamsDto,
   RoomTransferDto,
+  UpdateRoomDto,
   UpdateRoomFeeDto,
 } from "./dto";
 import { RoomsService } from "./rooms.service";
@@ -48,6 +49,15 @@ export class RoomsController {
   @Post("transfer")
   transfer(@CurrentUser() user: AuthUser, @ValidatedBody(RoomTransferDto) dto: RoomTransferDto) {
     return this.rooms.transfer(user, dto);
+  }
+
+  @Put(":id")
+  update(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @ValidatedBody(UpdateRoomDto) dto: UpdateRoomDto,
+  ) {
+    return this.rooms.update(user, id, dto);
   }
 
   @Put(":id/fee-settings")

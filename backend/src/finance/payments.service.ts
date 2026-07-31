@@ -348,7 +348,10 @@ export class PaymentsService {
         };
       })
       .filter((d) => d.duesPaisa > 0)
-      .sort((a, b) => b.duesPaisa - a.duesPaisa);
+      // Longest-overdue first (monthsOverdue desc), so a resident 5 months
+      // behind on a small fee ranks above one 1 month behind on a large fee.
+      // Amount owed breaks ties within the same overdue age.
+      .sort((a, b) => b.monthsOverdue - a.monthsOverdue || b.duesPaisa - a.duesPaisa);
   }
 
   async listDues(user: AuthUser, params: { page?: number; pageSize?: number; search?: string }) {

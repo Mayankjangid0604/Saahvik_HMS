@@ -255,6 +255,18 @@ export class AuthService {
     return { enabled: false };
   }
 
+  // ---------- logout (server-side token revocation) ----------
+
+  async logout(user: AuthUser) {
+    if (user.role === "owner") {
+      await this.prisma.owner.update({
+        where: { id: user.userId },
+        data: { tokenVersion: { increment: 1 } },
+      });
+    }
+    return { ok: true };
+  }
+
   // ---------- password lifecycle ----------
 
   async forgotPassword(email: string) {

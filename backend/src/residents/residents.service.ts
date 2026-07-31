@@ -8,6 +8,7 @@ import { pageArgs, paginated, type Paginated } from "../common/pagination";
 import { fileUrl } from "../files/files.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { SequenceService } from "../common/sequence.service";
 import { validateAdmissionData } from "./admission-validation";
 import type {
   BulkImportDto,
@@ -70,6 +71,7 @@ export class ResidentsService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(NotificationsService) private readonly notifications: NotificationsService,
+    @Inject(SequenceService) private readonly sequence: SequenceService,
   ) {}
 
   async list(user: AuthUser, params: ResidentListParamsDto): Promise<Paginated<unknown>> {
@@ -177,6 +179,14 @@ export class ResidentsService {
         bedToOccupy = bed.id;
       }
 
+      // Generate sequential form number: HOSTEL_YEAR_SEQ
+      const hostel = await tx.hostel.findFirst({ where: { orgId: user.orgId } });
+      const year = new Date().getFullYear();
+      const seq = await this.sequence.next(tx, user.orgId, "form", year);
+      const formNo = this.sequence.formatFormNo(hostel?.id ?? user.orgId, year, seq);
+
+      const admissionData = { ...(dto.admissionData ?? {}), formNo } as Record<string, string>;
+
       const resident = await tx.resident.create({
         data: {
           orgId: user.orgId,
@@ -196,7 +206,7 @@ export class ResidentsService {
           monthlyFeePaisa,
           depositPaisa: dto.depositPaisa ?? 0,
           notes: dto.notes,
-          admissionData: dto.admissionData as Prisma.InputJsonValue | undefined,
+          admissionData: admissionData as Prisma.InputJsonValue,
         },
         include: RESIDENT_INCLUDE,
       });

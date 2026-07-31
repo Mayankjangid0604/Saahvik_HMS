@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, Save } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Lock, Save } from "lucide-react";
 import { createResident } from "@/api/resident.api";
 import { listAllRooms } from "@/api/hostel.api";
 import { getAdmissionFormConfig } from "@/api/settings.api";
@@ -21,12 +21,12 @@ import { FileUpload, type UploadedFile } from "@/components/shared/FileUpload";
 import { RoomPicker } from "@/components/shared/RoomPicker";
 import { BedPicker } from "@/components/shared/BedPicker";
 import { rupeesToPaisa } from "@/lib/format";
+import { saveDraft as saveDraftToStore, getDraft, deleteDraft, clearLegacyDraft } from "./draft-store";
 
-const DRAFT_KEY = "saahvik.draft.add-resident";
+const STEPS = ["Personal details", "Room details", "Fee details"] as const;
 
 type FormValues = Record<string, string>;
 
-/** Zod schema for one configurable admission field. */
 function fieldSchema(f: AdmissionFormField): z.ZodType<string> {
   let s: z.ZodType<string> =
     f.required && f.type !== "auto"
@@ -47,11 +47,51 @@ function fieldSchema(f: AdmissionFormField): z.ZodType<string> {
   return s;
 }
 
+function StepIndicator({ current, steps }: { current: number; steps: readonly string[] }) {
+  return (
+    <nav className="mb-6 flex items-center gap-1">
+      {steps.map((label, i) => {
+        const done = i < current;
+        const active = i === current;
+        return (
+          <div key={label} className="flex items-center gap-1">
+            {i > 0 && <div className={`h-px w-6 ${done ? "bg-accent" : "bg-slate-200"}`} />}
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                  done
+                    ? "bg-accent text-white"
+                    : active
+                      ? "border-2 border-accent text-accent"
+                      : "border border-slate-300 text-muted"
+                }`}
+              >
+                {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
+              </span>
+              <span
+                className={`hidden text-xs font-medium sm:inline ${
+                  active ? "text-ink" : "text-muted"
+                }`}
+              >
+                {label}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function AddResidentPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const draftId = searchParams.get("draft");
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [step, setStep] = useState(0);
   const [files, setFiles] = useState<Record<string, UploadedFile[]>>({});
+  const [currentDraftId, setCurrentDraftId] = useState<string | undefined>(draftId ?? undefined);
   const initializedRef = useRef(false);
 
   const { data: config } = useQuery({
@@ -76,6 +116,11 @@ export function AddResidentPage() {
     return z.object(shape);
   }, [admissionFields]);
 
+  const admissionFieldKeys = useMemo(
+    () => new Set(admissionFields.map((f) => f.key)),
+    [admissionFields],
+  );
+
   const {
     register,
     handleSubmit,
@@ -83,14 +128,13 @@ export function AddResidentPage() {
     setValue,
     getValues,
     reset,
+    trigger,
     formState: { errors },
   } = useForm<FormValues>({
-    // The schema is built dynamically from config, so its static input type is
-    // looser than FormValues — safe because every field parses to a string.
     resolver: zodResolver(schema) as unknown as Resolver<FormValues>,
+    mode: "onBlur",
   });
 
-  // Seed auto-filled values (and restore any saved draft) once config arrives
   useEffect(() => {
     if (!config || initializedRef.current) return;
     initializedRef.current = true;
@@ -102,29 +146,28 @@ export function AddResidentPage() {
         f.autoFill === "today"
           ? today
           : f.autoFill === "formNo"
-            ? `ADM-${new Date().getFullYear()}-${String(Math.floor(1000 + Math.random() * 9000))}`
+            ? "(auto-generated on submit)"
             : "";
     }
-    const raw = localStorage.getItem(DRAFT_KEY);
-    if (raw) {
-      try {
-        reset({ ...values, ...(JSON.parse(raw) as FormValues) });
-        toast({ title: "Draft restored", description: "Continuing your unsaved form.", variant: "info" });
+    clearLegacyDraft();
+    if (draftId) {
+      const draft = getDraft(draftId);
+      if (draft) {
+        reset({ ...values, ...draft.data });
+        toast({ title: "Draft restored", description: `Continuing "${draft.name}".`, variant: "info" });
         return;
-      } catch {
-        localStorage.removeItem(DRAFT_KEY);
       }
     }
     reset(values);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config]);
 
-  const saveDraft = () => {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(getValues()));
-    toast({ title: "Draft saved", description: "You can finish this later.", variant: "success" });
+  const handleSaveDraft = () => {
+    const id = saveDraftToStore(getValues(), currentDraftId);
+    setCurrentDraftId(id);
+    toast({ title: "Draft saved", description: "You can find it on the Residents page.", variant: "success" });
   };
 
-  // Fixed-fee rooms lock the fee input (Change 3)
   const roomId = watch("roomId");
   const selectedRoom = (allRooms ?? []).find((r) => r.id === roomId);
   const isFixedFee = selectedRoom?.feeMode === "fixed" && selectedRoom.fixedFeeAmountPaisa != null;
@@ -164,7 +207,7 @@ export function AddResidentPage() {
       });
     },
     onSuccess: (resident) => {
-      localStorage.removeItem(DRAFT_KEY);
+      if (currentDraftId) deleteDraft(currentDraftId);
       queryClient.invalidateQueries({ queryKey: ["residents"] });
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
       toast({
@@ -177,6 +220,24 @@ export function AddResidentPage() {
     onError: (err: Error) =>
       toast({ title: "Could not add resident", description: err.message, variant: "error" }),
   });
+
+  const goNext = async () => {
+    if (step === 0) {
+      const personalKeys = [...admissionFieldKeys];
+      const valid = await trigger(personalKeys);
+      if (!valid) return;
+    } else if (step === 1) {
+      const valid = await trigger(["roomId", "bedId"]);
+      if (!valid) return;
+    }
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const goBack = () => {
+    setStep((s) => Math.max(s - 1, 0));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   if (!config) {
     return (
@@ -206,7 +267,7 @@ export function AddResidentPage() {
         ) : f.type === "select" ? (
           <Select
             error={!!error}
-            placeholder="Select…"
+            placeholder="Select..."
             options={(f.options ?? []).map((o) => ({ value: o, label: o }))}
             {...register(f.key)}
           />
@@ -226,100 +287,149 @@ export function AddResidentPage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Add resident"
-        subtitle="Fields are configured in Settings → Admission Form"
+        subtitle={`Step ${step + 1} of ${STEPS.length} — ${STEPS[step]}`}
         actions={
-          <Button variant="outline" size="sm" onClick={saveDraft}>
+          <Button variant="outline" size="sm" onClick={handleSaveDraft}>
             <Save className="h-3.5 w-3.5" /> Save draft
           </Button>
         }
       />
 
-      <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
-        <Card>
-          <CardHeader title="Admission details" subtitle="From your admission form configuration" />
-          <CardBody className="grid gap-3 sm:grid-cols-2">
-            {fileFields.map((f) => (
-              <FormField key={f.key} label={f.label} required={f.required}>
-                <FileUpload
-                  label={`Upload ${f.label.toLowerCase()}`}
-                  accept={f.key === "photo" ? ".jpg,.jpeg,.png" : ".jpg,.jpeg,.png,.pdf,.doc,.docx"}
-                  value={files[f.key] ?? []}
-                  onChange={(next) => setFiles((prev) => ({ ...prev, [f.key]: next }))}
-                />
-              </FormField>
-            ))}
-            {admissionFields.map(renderField)}
-          </CardBody>
-        </Card>
+      <StepIndicator current={step} steps={STEPS} />
 
-        <Card>
-          <CardHeader title="Room & fees" subtitle="Room assignment and money live here, not on the admission form" />
-          <CardBody className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormField label="Room" error={errors.roomId?.message as string | undefined} required>
-                <RoomPicker
-                  value={roomId ?? ""}
-                  onChange={(id) => {
-                    setValue("roomId", id, { shouldValidate: true });
-                    setValue("bedId", "");
-                  }}
-                  onlyWithVacancy
-                  error={!!errors.roomId}
-                />
-              </FormField>
-              <FormField label="Bed" error={errors.bedId?.message as string | undefined} required>
-                <BedPicker
-                  roomId={roomId ?? ""}
-                  value={watch("bedId") ?? ""}
-                  onChange={(id) => setValue("bedId", id, { shouldValidate: true })}
-                  error={!!errors.bedId}
-                />
-              </FormField>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormField
-                label="Monthly fee (₹)"
-                error={errors.monthlyFeeRupees?.message as string | undefined}
-                required
-                hint={
-                  isFixedFee ? undefined : "Entered per resident — this room has no fixed fee"
-                }
-              >
-                <Input
-                  type="number"
-                  min={0}
-                  step="100"
-                  placeholder="5500"
-                  disabled={isFixedFee}
-                  error={!!errors.monthlyFeeRupees}
-                  {...register("monthlyFeeRupees")}
-                />
-                {isFixedFee && (
-                  <p className="mt-1 flex items-center gap-1 text-xs text-muted">
-                    <Lock className="h-3 w-3 text-accent" /> Fee fixed by room —{" "}
-                    <Link to="/rooms" className="text-accent-600 hover:underline">
-                      change it at the room level
-                    </Link>
-                  </p>
+      <form onSubmit={handleSubmit((v) => mutation.mutate(v))}>
+        {/* Step 1: Personal details */}
+        {step === 0 && (
+          <Card>
+            <CardHeader title="Personal details" subtitle="From your admission form configuration" />
+            <CardBody className="grid gap-3 sm:grid-cols-2">
+              {fileFields.map((f) => (
+                <FormField key={f.key} label={f.label} required={f.required}>
+                  <FileUpload
+                    label={`Upload ${f.label.toLowerCase()}`}
+                    accept={f.key === "photo" ? ".jpg,.jpeg,.png" : ".jpg,.jpeg,.png,.pdf,.doc,.docx"}
+                    value={files[f.key] ?? []}
+                    onChange={(next) => setFiles((prev) => ({ ...prev, [f.key]: next }))}
+                  />
+                </FormField>
+              ))}
+              {admissionFields.map(renderField)}
+            </CardBody>
+          </Card>
+        )}
+
+        {/* Step 2: Room details */}
+        {step === 1 && (
+          <Card>
+            <CardHeader title="Room details" subtitle="Pick the room and bed for this resident" />
+            <CardBody className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField label="Room" error={errors.roomId?.message as string | undefined} required>
+                  <RoomPicker
+                    value={roomId ?? ""}
+                    onChange={(id) => {
+                      setValue("roomId", id, { shouldValidate: true });
+                      setValue("bedId", "");
+                    }}
+                    onlyWithVacancy
+                    error={!!errors.roomId}
+                  />
+                </FormField>
+                <FormField label="Bed" error={errors.bedId?.message as string | undefined} required>
+                  <BedPicker
+                    roomId={roomId ?? ""}
+                    value={watch("bedId") ?? ""}
+                    onChange={(id) => setValue("bedId", id, { shouldValidate: true })}
+                    error={!!errors.bedId}
+                  />
+                </FormField>
+              </div>
+              {selectedRoom && (
+                <p className="rounded bg-slate-50 px-3 py-2 text-xs text-muted">
+                  {selectedRoom.number} — {selectedRoom.type} room, Floor {selectedRoom.floor}
+                  {selectedRoom.feeMode === "fixed" ? " (fixed fee)" : " (per-resident fee)"}
+                </p>
+              )}
+            </CardBody>
+          </Card>
+        )}
+
+        {/* Step 3: Fee details */}
+        {step === 2 && (
+          <Card>
+            <CardHeader
+              title="Fee details"
+              subtitle={isFixedFee ? "Monthly fee is set by the room — only security deposit is needed" : "Set the monthly fee and security deposit"}
+            />
+            <CardBody className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {!isFixedFee && (
+                  <FormField
+                    label="Monthly fee (₹)"
+                    error={errors.monthlyFeeRupees?.message as string | undefined}
+                    required
+                    hint="Entered per resident — this room has no fixed fee"
+                  >
+                    <Input
+                      type="number"
+                      min={0}
+                      step="100"
+                      placeholder="5500"
+                      error={!!errors.monthlyFeeRupees}
+                      {...register("monthlyFeeRupees")}
+                    />
+                  </FormField>
                 )}
-              </FormField>
-              <FormField
-                label="Security deposit (₹)"
-                error={errors.depositRupees?.message as string | undefined}
-              >
-                <Input type="number" min={0} step="500" error={!!errors.depositRupees} {...register("depositRupees")} />
-              </FormField>
-            </div>
-          </CardBody>
-        </Card>
+                {isFixedFee && (
+                  <FormField label="Monthly fee (₹)">
+                    <Input
+                      type="number"
+                      disabled
+                      value={watch("monthlyFeeRupees")}
+                      readOnly
+                    />
+                    <p className="mt-1 flex items-center gap-1 text-xs text-muted">
+                      <Lock className="h-3 w-3 text-accent" /> Fixed by room —{" "}
+                      <Link to="/rooms" className="text-accent-600 hover:underline">
+                        change in room settings
+                      </Link>
+                    </p>
+                  </FormField>
+                )}
+                <FormField
+                  label="Security deposit (₹)"
+                  error={errors.depositRupees?.message as string | undefined}
+                >
+                  <Input type="number" min={0} step="500" error={!!errors.depositRupees} {...register("depositRupees")} />
+                </FormField>
+              </div>
+            </CardBody>
+          </Card>
+        )}
 
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate("/residents")}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={mutation.isPending}>
-            Add resident
-          </Button>
+        {/* Navigation */}
+        <div className="mt-4 flex items-center justify-between">
+          <div>
+            {step > 0 && (
+              <Button type="button" variant="outline" onClick={goBack}>
+                <ChevronLeft className="h-3.5 w-3.5" /> Back
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={() => navigate("/residents")}>
+              Cancel
+            </Button>
+            {step < STEPS.length - 1 ? (
+              <Button type="button" onClick={goNext}>
+                Next <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <Button type="submit" isLoading={mutation.isPending}>
+                Add resident
+              </Button>
+            )}
+          </div>
         </div>
       </form>
     </div>

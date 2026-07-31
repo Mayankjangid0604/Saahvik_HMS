@@ -54,4 +54,34 @@ export class AuditService {
       this.logger.error(`Audit write failed for ${entry.action}`, err as Error);
     }
   }
+
+  /**
+   * Audit entry for a system-initiated mutation (cron jobs) with no human
+   * actor. Same atomicity rules as log().
+   */
+  async logSystem(
+    orgId: string,
+    entry: AuditEntryInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const client = tx ?? this.prisma;
+    try {
+      await client.auditLogEntry.create({
+        data: {
+          orgId,
+          actorUserId: "system",
+          actorName: "System",
+          actorRole: "system",
+          action: entry.action,
+          entityType: entry.entityType,
+          entityId: entry.entityId,
+          entityLabel: entry.entityLabel,
+          details: (entry.details ?? {}) as Prisma.InputJsonValue,
+        },
+      });
+    } catch (err) {
+      if (tx) throw err;
+      this.logger.error(`Audit write failed for ${entry.action}`, err as Error);
+    }
+  }
 }
