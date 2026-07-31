@@ -382,6 +382,7 @@ model Resident {
   invoices   Invoice[]
   deposits   Deposit[]
 
+  @@unique([orgId, phone])
   @@index([orgId, status])
   @@index([orgId, name])
 }
