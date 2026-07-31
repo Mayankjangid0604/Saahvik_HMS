@@ -15,6 +15,7 @@ import { FinanceModule } from "./finance/finance.module";
 import { WingsModule } from "./wings/wings.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PdfModule } from "./pdf/pdf.module";
+import { PortalModule } from "./portal/portal.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ReportsModule } from "./reports/reports.module";
 import { ReservationsModule } from "./reservations/reservations.module";
@@ -58,6 +59,7 @@ import { HealthController } from "./health.controller";
     VendorsModule,
     SearchModule,
     ApprovalsModule,
+    PortalModule,
   ],
   controllers: [HealthController],
   providers: [
