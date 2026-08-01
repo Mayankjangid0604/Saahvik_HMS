@@ -5,7 +5,9 @@ import { ApiError } from "../common/api-error";
 import type { AuthUser } from "../common/auth-user";
 import { pageArgs, paginated, type Paginated } from "../common/pagination";
 import { PrismaService } from "../prisma/prisma.service";
+import { sanitizeAmenities } from "./amenities";
 import type {
+  BlockRoomDto,
   BulkAddRoomsDto,
   CreateRoomDto,
   RoomListParamsDto,
@@ -52,6 +54,9 @@ export function toRoomDto(room: RoomWithBeds) {
     wingName: room.wing?.name,
     beds,
     occupiedCount: beds.filter((b) => b.status === "occupied").length,
+    amenities: room.amenities,
+    blocked: room.blocked,
+    blockedReason: room.blockedReason ?? undefined,
     notes: room.notes ?? undefined,
   };
 }
@@ -79,6 +84,8 @@ export class RoomsService {
     const where: Prisma.RoomWhereInput = { orgId: user.orgId };
     if (params.floor != null) where.floor = params.floor;
     if (params.type && params.type !== "all") where.type = params.type as RoomType;
+    if (params.availability === "blocked") where.blocked = true;
+    else if (params.availability === "available") where.blocked = false;
     if (params.search) {
       where.OR = [
         { number: { contains: params.search, mode: "insensitive" } },
@@ -139,6 +146,7 @@ export class RoomsService {
         feeMode: dto.feeMode,
         fixedFeeAmountPaisa: fixedFee,
         monthlyRentPaisa: fixedFee ?? 0,
+        amenities: sanitizeAmenities(dto.amenities),
         notes: dto.notes,
         beds: {
           create: Array.from({ length: dto.capacity }, (_, i) => ({
@@ -233,6 +241,7 @@ export class RoomsService {
         ...(dto.number ? { number: dto.number } : {}),
         ...(dto.floor != null ? { floor: dto.floor } : {}),
         ...(wingId !== undefined ? { wingId } : {}),
+        ...(dto.amenities !== undefined ? { amenities: sanitizeAmenities(dto.amenities) } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes || null } : {}),
       },
       include: ROOM_INCLUDE,
@@ -306,6 +315,14 @@ export class RoomsService {
         include: { room: true },
       });
       if (!toBed) throw ApiError.notFound("Target bed");
+      // Feature 3 — a blocked (maintenance) room cannot receive residents.
+      if (toBed.room.blocked) {
+        throw new ApiError(
+          HttpStatus.CONFLICT,
+          "ROOM_BLOCKED",
+          `${toBed.room.number} is under a maintenance hold and cannot receive residents`,
+        );
+      }
       if (toBed.status === "occupied") {
         throw new ApiError(
           HttpStatus.CONFLICT,
@@ -357,6 +374,83 @@ export class RoomsService {
       );
     });
     return { ok: true };
+  }
+
+  /**
+   * PUT /rooms/:id/block — toggle a maintenance hold (feature 3). A blocked
+   * room is distinct from occupancy: its beds keep their occupied/vacant status,
+   * but assignment logic (createResident, transfer, reservation) refuses it.
+   * Blocking a room that still has occupants is allowed (you can flag a room for
+   * maintenance while residents are being moved out) but surfaced in the audit.
+   */
+  async setBlocked(user: AuthUser, roomId: string, dto: BlockRoomDto) {
+    const room = await this.prisma.room.findFirst({
+      where: { id: roomId, orgId: user.orgId },
+      include: { beds: true },
+    });
+    if (!room) throw ApiError.notFound("Room");
+
+    const occupiedCount = room.beds.filter((b) => b.status === "occupied").length;
+    const updated = await this.prisma.room.update({
+      where: { id: room.id },
+      data: {
+        blocked: dto.blocked,
+        blockedReason: dto.blocked ? dto.reason : null,
+      },
+      include: ROOM_INCLUDE,
+    });
+    await this.audit.log(user, {
+      action: dto.blocked ? "blocked_room" : "unblocked_room",
+      entityType: "room",
+      entityId: room.id,
+      entityLabel: room.number,
+      details: { reason: dto.blocked ? dto.reason : undefined, occupiedAtBlock: occupiedCount },
+    });
+    return toRoomDto(updated);
+  }
+
+  /**
+   * GET /rooms/floors — floor-level grouping + occupancy summary (feature 1).
+   * No Floor entity: floors are derived from Room.floor. Returns per-floor
+   * bed/room/occupancy rollups plus the rooms on each floor.
+   */
+  async floorSummary(user: AuthUser) {
+    const rooms = await this.prisma.room.findMany({
+      where: { orgId: user.orgId },
+      include: ROOM_INCLUDE,
+      orderBy: [{ floor: "asc" }, { number: "asc" }],
+    });
+    const byFloor = new Map<
+      number,
+      {
+        floor: number;
+        roomCount: number;
+        totalBeds: number;
+        occupiedBeds: number;
+        blockedRooms: number;
+        rooms: ReturnType<typeof toRoomDto>[];
+      }
+    >();
+    for (const room of rooms) {
+      let group = byFloor.get(room.floor);
+      if (!group) {
+        group = { floor: room.floor, roomCount: 0, totalBeds: 0, occupiedBeds: 0, blockedRooms: 0, rooms: [] };
+        byFloor.set(room.floor, group);
+      }
+      const dto = toRoomDto(room);
+      group.roomCount += 1;
+      group.totalBeds += room.beds.length;
+      group.occupiedBeds += dto.occupiedCount;
+      if (room.blocked) group.blockedRooms += 1;
+      group.rooms.push(dto);
+    }
+    return [...byFloor.values()]
+      .sort((a, b) => a.floor - b.floor)
+      .map((g) => ({
+        ...g,
+        vacantBeds: g.totalBeds - g.occupiedBeds,
+        occupancyPct: g.totalBeds === 0 ? 0 : Math.round((g.occupiedBeds / g.totalBeds) * 100),
+      }));
   }
 
   async remove(user: AuthUser, roomId: string) {

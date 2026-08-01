@@ -2,9 +2,10 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { Organization } from "@prisma/client";
 import type { AuthUser } from "../common/auth-user";
 import { PaymentsService } from "../finance/payments.service";
-import { PdfService, pdfMoney, type PdfOrgHeader } from "../pdf/pdf.service";
+import { PdfService, pdfMoney, type PdfBrand, type PdfOrgHeader } from "../pdf/pdf.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { toResidentDto } from "../residents/residents.service";
+import { XlsxService } from "../xlsx/xlsx.service";
 
 export interface ReportFilters {
   from?: string;
@@ -14,15 +15,21 @@ export interface ReportFilters {
   status?: string; // residents report: active | checked_out | all
 }
 
+/** paisa → rupees number, for Excel money cells (formatted with numFmt). */
+const rupees = (paisa: number): number => Math.round(paisa) / 100;
+
 @Injectable()
 export class ReportsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(PaymentsService) private readonly payments: PaymentsService,
     @Inject(PdfService) private readonly pdf: PdfService,
+    @Inject(XlsxService) private readonly xlsx: XlsxService,
   ) {}
 
-  private async orgHeader(orgId: string): Promise<{ org: Organization; header: PdfOrgHeader }> {
+  private async orgHeader(
+    orgId: string,
+  ): Promise<{ org: Organization; header: PdfOrgHeader; brand: PdfBrand }> {
     const org = await this.prisma.organization.findUniqueOrThrow({ where: { id: orgId } });
     return {
       org,
@@ -33,7 +40,9 @@ export class ReportsService {
         state: org.state ?? undefined,
         pincode: org.pincode ?? undefined,
         phone: org.phone ?? undefined,
+        gstin: org.gstEnabled ? (org.gstin ?? undefined) : undefined,
       },
+      brand: { primary: org.themeColorPrimary, accent: org.themeColorAccent },
     };
   }
 
@@ -61,11 +70,12 @@ export class ReportsService {
 
   async occupancyPdf(user: AuthUser, filters: ReportFilters): Promise<Buffer> {
     const rows = await this.occupancyData(user);
-    const { header } = await this.orgHeader(user.orgId);
+    const { header, brand } = await this.orgHeader(user.orgId);
     const totalOccupied = rows.reduce((s, r) => s + r.occupied, 0);
     const totalCapacity = rows.reduce((s, r) => s + r.capacity, 0);
     return this.pdf.table({
       org: header,
+      brand,
       title: "Occupancy Report",
       subtitle: rangeSubtitle(filters),
       columns: [
@@ -98,9 +108,10 @@ export class ReportsService {
 
   async duesPdf(user: AuthUser, filters: ReportFilters): Promise<Buffer> {
     const rows = await this.duesData(user);
-    const { header } = await this.orgHeader(user.orgId);
+    const { header, brand } = await this.orgHeader(user.orgId);
     return this.pdf.table({
       org: header,
+      brand,
       title: "Dues Report",
       subtitle: filters.to ? `As of ${filters.to}` : undefined,
       columns: [
@@ -147,9 +158,10 @@ export class ReportsService {
 
   async residentsPdf(user: AuthUser, filters: ReportFilters): Promise<Buffer> {
     const rows = await this.residentsData(user, filters);
-    const { header } = await this.orgHeader(user.orgId);
+    const { header, brand } = await this.orgHeader(user.orgId);
     return this.pdf.table({
       org: header,
+      brand,
       title: "Resident List",
       subtitle: `Status: ${filters.status ?? "active"}${rangeSuffix(filters)}`,
       columns: [
@@ -210,9 +222,10 @@ export class ReportsService {
 
   async collectionPdf(user: AuthUser, filters: ReportFilters): Promise<Buffer> {
     const rows = await this.collectionData(user, filters);
-    const { header } = await this.orgHeader(user.orgId);
+    const { header, brand } = await this.orgHeader(user.orgId);
     return this.pdf.table({
       org: header,
+      brand,
       title: "Monthly Collection",
       subtitle:
         filters.month && filters.year ? `${filters.year}-${filters.month}` : rangeSubtitle(filters),
@@ -233,6 +246,206 @@ export class ReportsService {
         pdfMoney(r.totalPaisa),
       ]),
       summary: `Grand total: ${pdfMoney(rows.reduce((s, r) => s + r.totalPaisa, 0))}`,
+    });
+  }
+
+  // ---------- Excel exports (feature 13) ----------
+  // Each reuses the SAME *Data method as its PDF counterpart — no duplicated
+  // query logic between the PDF and Excel paths.
+
+  async occupancyXlsx(user: AuthUser, _filters: ReportFilters): Promise<Buffer> {
+    const rows = await this.occupancyData(user);
+    const totalOccupied = rows.reduce((s, r) => s + r.occupied, 0);
+    const totalCapacity = rows.reduce((s, r) => s + r.capacity, 0);
+    return this.xlsx.table({
+      sheetName: "Occupancy",
+      title: "Occupancy Report",
+      columns: [
+        { label: "Floor", kind: "number" },
+        { label: "Room" },
+        { label: "Type" },
+        { label: "Capacity", kind: "number" },
+        { label: "Occupied", kind: "number" },
+        { label: "Occupancy %", kind: "number" },
+      ],
+      rows: rows.map((r) => [r.floor, r.roomNumber, r.type, r.capacity, r.occupied, r.occupancyPct]),
+      summary: `Overall: ${totalOccupied}/${totalCapacity} beds occupied`,
+    });
+  }
+
+  async duesXlsx(user: AuthUser, _filters: ReportFilters): Promise<Buffer> {
+    const rows = await this.duesData(user);
+    return this.xlsx.table({
+      sheetName: "Dues",
+      title: "Dues Report",
+      columns: [
+        { label: "Resident", width: 24 },
+        { label: "Room" },
+        { label: "Phone", width: 16 },
+        { label: "Months", kind: "number" },
+        { label: "Severity" },
+        { label: "Dues", kind: "money" },
+      ],
+      rows: rows.map((d) => [
+        d.residentName,
+        d.roomNumber ?? "-",
+        d.phone,
+        d.monthsOverdue,
+        d.severity,
+        rupees(d.duesPaisa),
+      ]),
+      summary: `Total outstanding: ${pdfMoney(rows.reduce((s, d) => s + d.duesPaisa, 0))}`,
+    });
+  }
+
+  async residentsXlsx(user: AuthUser, filters: ReportFilters): Promise<Buffer> {
+    const rows = await this.residentsData(user, filters);
+    return this.xlsx.table({
+      sheetName: "Residents",
+      title: "Resident List",
+      columns: [
+        { label: "Name", width: 24 },
+        { label: "Room" },
+        { label: "Phone", width: 16 },
+        { label: "Joined" },
+        { label: "Monthly Fee", kind: "money" },
+        { label: "Dues", kind: "money" },
+      ],
+      rows: rows.map((r) => [
+        r.name,
+        r.roomNumber ?? "-",
+        r.phone,
+        r.joinDate.slice(0, 10),
+        rupees(r.monthlyFeePaisa),
+        rupees(r.duesPaisa),
+      ]),
+      summary: `${rows.length} residents`,
+    });
+  }
+
+  async collectionXlsx(user: AuthUser, filters: ReportFilters): Promise<Buffer> {
+    const rows = await this.collectionData(user, filters);
+    return this.xlsx.table({
+      sheetName: "Collection",
+      title: "Monthly Collection",
+      columns: [
+        { label: "Month" },
+        { label: "Rent", kind: "money" },
+        { label: "Deposits", kind: "money" },
+        { label: "Other", kind: "money" },
+        { label: "Payments", kind: "number" },
+        { label: "Total", kind: "money" },
+      ],
+      rows: rows.map((r) => [
+        r.month,
+        rupees(r.rentPaisa),
+        rupees(r.depositPaisa),
+        rupees(r.otherPaisa),
+        r.paymentCount,
+        rupees(r.totalPaisa),
+      ]),
+      summary: `Grand total: ${pdfMoney(rows.reduce((s, r) => s + r.totalPaisa, 0))}`,
+    });
+  }
+
+  // ---------- staff report (feature 14) ----------
+
+  /**
+   * Staff roster + attendance summary. Attendance tracking is Phase BG-3; until
+   * it exists this report gracefully reports "not yet tracked" per member rather
+   * than erroring. Shape is stable so the BG-3 phase can fill attendance in
+   * without changing the report contract.
+   */
+  async staffData(user: AuthUser) {
+    const [owners, staff] = await this.prisma.$transaction([
+      this.prisma.owner.findMany({ where: { orgId: user.orgId }, orderBy: { createdAt: "asc" } }),
+      this.prisma.staff.findMany({ where: { orgId: user.orgId }, orderBy: { createdAt: "asc" } }),
+    ]);
+    const roster = [
+      ...owners.map((o) => ({
+        name: o.name,
+        email: o.email,
+        phone: o.phone ?? "",
+        role: "owner",
+        status: "active",
+        permissions: ["*"],
+        addedAt: o.createdAt.toISOString(),
+        lastActiveAt: undefined as string | undefined,
+        attendance: "not_yet_tracked" as const,
+      })),
+      ...staff.map((s) => ({
+        name: s.name,
+        email: s.email,
+        phone: s.phone ?? "",
+        role: s.role,
+        status: s.status,
+        permissions: s.permissions,
+        addedAt: s.createdAt.toISOString(),
+        lastActiveAt: s.lastLoginAt?.toISOString(),
+        attendance: "not_yet_tracked" as const,
+      })),
+    ];
+    return {
+      roster,
+      total: roster.length,
+      activeCount: roster.filter((m) => m.status === "active").length,
+      // Signals to the frontend that the attendance block is a placeholder
+      // pending Phase BG-3, so it can render "Not yet tracked" instead of zeros.
+      attendanceTracking: { available: false, note: "Attendance tracking arrives in Phase BG-3" },
+    };
+  }
+
+  async staffPdf(user: AuthUser): Promise<Buffer> {
+    const data = await this.staffData(user);
+    const { header, brand } = await this.orgHeader(user.orgId);
+    return this.pdf.table({
+      org: header,
+      brand,
+      title: "Staff Roster",
+      subtitle: `${data.total} people · ${data.activeCount} active · attendance not yet tracked (Phase BG-3)`,
+      columns: [
+        { label: "Name", width: 120 },
+        { label: "Role", width: 90 },
+        { label: "Status", width: 70 },
+        { label: "Phone", width: 100 },
+        { label: "Added", width: 80 },
+        { label: "Attendance", width: 80 },
+      ],
+      rows: data.roster.map((m) => [
+        m.name,
+        m.role,
+        m.status,
+        m.phone,
+        m.addedAt.slice(0, 10),
+        "Not tracked",
+      ]),
+      summary: `${data.total} staff/owners`,
+    });
+  }
+
+  async staffXlsx(user: AuthUser): Promise<Buffer> {
+    const data = await this.staffData(user);
+    return this.xlsx.table({
+      sheetName: "Staff",
+      title: "Staff Roster",
+      subtitle: `${data.total} people · ${data.activeCount} active · attendance not yet tracked (Phase BG-3)`,
+      columns: [
+        { label: "Name", width: 24 },
+        { label: "Role" },
+        { label: "Status" },
+        { label: "Phone", width: 16 },
+        { label: "Added" },
+        { label: "Attendance" },
+      ],
+      rows: data.roster.map((m) => [
+        m.name,
+        m.role,
+        m.status,
+        m.phone,
+        m.addedAt.slice(0, 10),
+        "Not tracked",
+      ]),
+      summary: `${data.total} staff/owners`,
     });
   }
 }

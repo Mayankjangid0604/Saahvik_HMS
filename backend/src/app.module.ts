@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
 import { ScheduleModule } from "@nestjs/schedule";
+import { ApprovalsModule } from "./approvals/approvals.module";
 import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { JwtAuthGuard } from "./common/jwt-auth.guard";
@@ -14,12 +15,17 @@ import { FinanceModule } from "./finance/finance.module";
 import { WingsModule } from "./wings/wings.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PdfModule } from "./pdf/pdf.module";
+import { PortalModule } from "./portal/portal.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ReportsModule } from "./reports/reports.module";
+import { ReservationsModule } from "./reservations/reservations.module";
 import { ResidentsModule } from "./residents/residents.module";
 import { RoomsModule } from "./rooms/rooms.module";
+import { SearchModule } from "./search/search.module";
 import { SettingsModule } from "./settings/settings.module";
 import { StaffModule } from "./staff/staff.module";
+import { VendorsModule } from "./vendors/vendors.module";
+import { XlsxModule } from "./xlsx/xlsx.module";
 import { HealthController } from "./health.controller";
 
 @Module({
@@ -34,6 +40,7 @@ import { HealthController } from "./health.controller";
     ScheduleModule.forRoot(),
     PrismaModule,
     PdfModule,
+    XlsxModule,
     AuditModule,
     AuthModule,
     SettingsModule,
@@ -48,6 +55,11 @@ import { HealthController } from "./health.controller";
     DashboardModule,
     ReportsModule,
     FilesModule,
+    ReservationsModule,
+    VendorsModule,
+    SearchModule,
+    ApprovalsModule,
+    PortalModule,
   ],
   controllers: [HealthController],
   providers: [

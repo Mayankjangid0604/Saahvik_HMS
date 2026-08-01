@@ -50,6 +50,17 @@ export interface Org {
   gstin?: string;
   plan: "basic";
   setupComplete: boolean;
+  /** GST/tax config (feature: GST on invoices). */
+  gstEnabled?: boolean;
+  /** GST rate as whole percent (e.g. 18 for 18%). */
+  gstRatePercent?: number;
+  /** When true, displayed prices already include GST. */
+  gstInclusive?: boolean;
+  /** Authenticated /files URL of the uploaded org logo. */
+  logoUrl?: string;
+  /** Branding theme colors (hex). */
+  themeColorPrimary?: string;
+  themeColorAccent?: string;
 }
 
 export interface LoginRequest {
@@ -170,6 +181,12 @@ export interface Room {
   beds: Bed[];
   occupiedCount: number;
   notes?: string;
+  /** Room amenities (feature: room amenities). Values from ROOM_AMENITIES. */
+  amenities?: string[];
+  /** Room taken out of service — no new allocations while blocked. */
+  blocked?: boolean;
+  /** Why the room is blocked (present when blocked). */
+  blockedReason?: string;
 }
 
 export interface CreateRoomInput {
@@ -270,6 +287,15 @@ export interface Resident {
   notes?: string;
   /** Answers to the configurable admission form, keyed by field key. */
   admissionData?: Record<string, string>;
+  /** Expiry date of the primary ID document (feature 4 — expiry tracking). */
+  idDocExpiryDate?: string;
+  /** Medical / emergency profile (feature: medical info). */
+  bloodGroup?: string;
+  allergies?: string;
+  dietaryPreference?: string;
+  medicalNotes?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
 }
 
 export interface ResidentListParams extends ListParams {
@@ -631,6 +657,18 @@ export interface DashboardChartPoint {
 export interface DashboardData {
   range: DashboardRange;
   rangeLabel: string;
+  /** Caller's role (feature 15 — role-based dashboard descriptor). */
+  role?: "owner" | "staff";
+  /** Effective permissions driving which sections render. */
+  permissions?: string[];
+  /**
+   * Whether the financial block is present. When false (permission-less staff),
+   * `dues`, `collection`, `collectionsChart`, `recentPayments`, `dueResidents`,
+   * the advance/cash figures and `thisMonthFixed` are ABSENT — not zeroed.
+   */
+  financialVisible?: boolean;
+  /** Count of ID docs / documents expiring soon (feature 4). */
+  expiringDocumentsCount?: number;
   occupancy: {
     totalBeds: number;
     occupiedBeds: number;
@@ -640,9 +678,10 @@ export interface DashboardData {
     /** One entry per hostel/property. Skip the list in the UI when length <= 1. */
     byProperty: PropertyOccupancy[];
   };
-  dues: DuesSummary;
-  /** Collection for the selected range, net of refunds. */
-  collection: {
+  /** Present only when `financialVisible`. */
+  dues?: DuesSummary;
+  /** Collection for the selected range, net of refunds. Present only when `financialVisible`. */
+  collection?: {
     totalPaisa: number;
     byMethod: CollectionByMethod;
   };
@@ -652,11 +691,12 @@ export interface DashboardData {
    */
   netProfitPaisa?: number;
   activeResidents: number;
-  /** Rent overpayment routed to advance during the range. */
-  advanceCollectedPaisa: number;
-  /** Live snapshot: total prepaid advance held across active residents. */
-  advanceBalanceTotalPaisa: number;
-  cashInflowPaisa: number;
+  /** Rent overpayment routed to advance during the range. Present only when `financialVisible`. */
+  advanceCollectedPaisa?: number;
+  /** Live snapshot: total prepaid advance held across active residents. Present only when `financialVisible`. */
+  advanceBalanceTotalPaisa?: number;
+  /** Present only when `financialVisible`. */
+  cashInflowPaisa?: number;
   complaints: { total: number; active: number; resolved: number };
   /** Whether profit/expense figures are included (owner or manageExpenses). */
   expensesVisible: boolean;
@@ -665,14 +705,15 @@ export interface DashboardData {
     totalPaisa: number;
     breakdown: ExpenseBreakdownItem[];
   };
-  /** Range-appropriate granularity (hour/day/month). */
-  collectionsChart: DashboardChartPoint[];
-  recentPayments: Payment[];
+  /** Range-appropriate granularity (hour/day/month). Present only when `financialVisible`. */
+  collectionsChart?: DashboardChartPoint[];
+  /** Present only when `financialVisible`. */
+  recentPayments?: Payment[];
   recentComplaints: Complaint[];
-  /** Due residents, longest overdue first. */
-  dueResidents: DueEntry[];
-  /** Current calendar month, NEVER affected by the range filter. */
-  thisMonthFixed: {
+  /** Due residents, longest overdue first. Present only when `financialVisible`. */
+  dueResidents?: DueEntry[];
+  /** Current calendar month, NEVER affected by the range filter. Present only when `financialVisible`. */
+  thisMonthFixed?: {
     collectionPaisa: number;
     advancePaisa: number;
     /** Present only when `expensesVisible`. */
@@ -823,4 +864,347 @@ export interface CollectionReportRow {
   otherPaisa: number;
   totalPaisa: number;
   paymentCount: number;
+}
+
+/** Output format for the downloadable (PDF/Excel) reports (features 13, 14). */
+export type ReportDownloadFormat = "pdf" | "xlsx";
+
+/** Report kinds that support PDF/Excel download and scheduling. */
+export type StaffReportType =
+  | "occupancy"
+  | "dues"
+  | "residents"
+  | "monthly-collection"
+  | "staff";
+
+/** Staff roster + attendance summary (feature 14). Attendance is Phase BG-3. */
+export interface StaffReportMember {
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  status: string;
+  permissions: string[];
+  addedAt: string;
+  lastActiveAt?: string;
+  attendance: "not_yet_tracked";
+}
+
+export interface StaffReport {
+  roster: StaffReportMember[];
+  total: number;
+  activeCount: number;
+  attendanceTracking: { available: boolean; note: string };
+}
+
+// ---------- Room floors & amenities (rooms extras) ----------
+
+/** Per-floor occupancy rollup (GET /rooms/floors). */
+export interface FloorSummary {
+  floor: number;
+  roomCount: number;
+  totalBeds: number;
+  occupiedBeds: number;
+  vacantBeds: number;
+  blockedRooms: number;
+  occupancyPct: number;
+  rooms: Room[];
+}
+
+// ---------- Resident documents (feature 12) & expiry (feature 4) ----------
+
+export type DocumentCategory =
+  | "id_proof"
+  | "admission_form"
+  | "medical_certificate"
+  | "agreement"
+  | "photo"
+  | "other";
+
+export interface ResidentDocument {
+  id: string;
+  residentId: string;
+  category: DocumentCategory;
+  /** Authenticated /files URL. */
+  fileUrl: string;
+  label?: string;
+  expiryDate?: string;
+  uploadedByName: string;
+  uploadedAt: string;
+}
+
+export interface ExpiringDocItem {
+  residentId: string;
+  residentName: string;
+  phone: string;
+  source: "id_doc" | "document";
+  category: string;
+  label: string;
+  expiryDate: string;
+  daysUntilExpiry: number;
+  expired: boolean;
+}
+
+export interface ExpiringDocumentsReport {
+  withinDays: number;
+  total: number;
+  expiredCount: number;
+  items: ExpiringDocItem[];
+}
+
+// ---------- Reservations (feature 5) ----------
+
+export type ReservationStatus = "held" | "confirmed" | "converted" | "cancelled" | "expired";
+
+export interface Reservation {
+  id: string;
+  roomId: string;
+  roomNumber?: string;
+  bedId?: string;
+  residentName: string;
+  residentPhone: string;
+  /** Set once the reservation has been converted into a real resident. */
+  residentId?: string;
+  status: ReservationStatus;
+  expectedCheckIn: string;
+  holdUntil?: string;
+  monthlyFeePaisa: number;
+  depositPaisa: number;
+  notes?: string;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface ReservationListParams extends ListParams {
+  status?: ReservationStatus | "all";
+  roomId?: string;
+}
+
+export interface CreateReservationInput {
+  roomId: string;
+  bedId?: string;
+  residentName: string;
+  residentPhone: string;
+  expectedCheckIn: string;
+  holdUntil?: string;
+  monthlyFeePaisa?: number;
+  depositPaisa?: number;
+  notes?: string;
+}
+
+// ---------- Vendors & purchases (feature 9) ----------
+
+export type VendorCategory =
+  | "groceries"
+  | "maintenance"
+  | "utilities"
+  | "furniture"
+  | "services"
+  | "supplies"
+  | "other";
+
+export interface Vendor {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  category: VendorCategory;
+  active: boolean;
+  notes?: string;
+  purchaseCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorListParams extends ListParams {
+  category?: VendorCategory | "all";
+  active?: boolean;
+}
+
+export interface CreateVendorInput {
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  category?: VendorCategory;
+  notes?: string;
+}
+
+export interface UpdateVendorInput {
+  name?: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  category?: VendorCategory;
+  active?: boolean;
+  notes?: string;
+}
+
+export interface PurchaseRecord {
+  id: string;
+  vendorId: string;
+  vendorName?: string;
+  label: string;
+  amountPaisa: number;
+  category: VendorCategory;
+  purchasedAt: string;
+  invoiceRef?: string;
+  /** Optional 1:1 link to an existing Expense. */
+  expenseId?: string;
+  notes?: string;
+  /** Authenticated /files URL when an invoice/attachment was uploaded. */
+  attachmentUrl?: string;
+  recordedByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseListParams extends ListParams {
+  vendorId?: string;
+  category?: VendorCategory | "all";
+  from?: string;
+  to?: string;
+}
+
+export interface CreatePurchaseInput {
+  vendorId: string;
+  label: string;
+  amountPaisa: number;
+  category?: VendorCategory;
+  purchasedAt: string;
+  invoiceRef?: string;
+  expenseId?: string;
+  notes?: string;
+  /** Storage key from a completed upload. */
+  attachmentKey?: string;
+}
+
+export interface PurchaseSummary {
+  totalPaisa: number;
+  count: number;
+}
+
+// ---------- Approvals (feature 18) ----------
+
+export type ApprovalType = "expense" | "purchase" | "discount" | "refund" | "room_block" | "other";
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
+export interface ApprovalRequest {
+  id: string;
+  type: ApprovalType;
+  status: ApprovalStatus;
+  requestedByUserId: string;
+  requestedByName: string;
+  entityType: string;
+  entityId?: string;
+  summary: string;
+  /** Opaque snapshot of the pending action. */
+  payload?: unknown;
+  decidedByUserId?: string;
+  decidedByName?: string;
+  decisionNote?: string;
+  decidedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApprovalListParams extends ListParams {
+  status?: ApprovalStatus | "all";
+  type?: ApprovalType;
+}
+
+export interface CreateApprovalInput {
+  type: ApprovalType;
+  entityType: string;
+  entityId?: string;
+  summary: string;
+  payload?: Record<string, unknown>;
+}
+
+// ---------- Search (features 10, 11) ----------
+
+export type SearchEntity = "residents" | "rooms" | "staff" | "complaints" | "global";
+
+export interface SearchHit {
+  entity: string;
+  id: string;
+  title: string;
+  subtitle?: string;
+  link: string;
+}
+
+export interface GlobalSearchResults {
+  residents: SearchHit[];
+  rooms: SearchHit[];
+  staff: SearchHit[];
+  complaints: SearchHit[];
+}
+
+export interface SavedSearch {
+  id: string;
+  name: string;
+  entity: SearchEntity;
+  query: unknown;
+  createdAt: string;
+}
+
+export interface CreateSavedSearchInput {
+  name: string;
+  entity: SearchEntity;
+  query: unknown;
+}
+
+// ---------- Scheduled reports (feature 16) ----------
+
+export type ScheduledReportType =
+  | "occupancy"
+  | "dues"
+  | "residents"
+  | "monthly_collection"
+  | "staff";
+
+export type ReportFormat = "pdf" | "xlsx";
+export type ScheduleFrequency = "daily" | "weekly" | "monthly";
+
+export interface ReportSchedule {
+  id: string;
+  name: string;
+  reportType: ScheduledReportType;
+  format: ReportFormat;
+  frequency: ScheduleFrequency;
+  filters?: Record<string, unknown>;
+  active: boolean;
+  lastRunAt?: string;
+  nextRunAt?: string;
+  createdAt: string;
+}
+
+export interface CreateReportScheduleInput {
+  name: string;
+  reportType: ScheduledReportType;
+  format?: ReportFormat;
+  frequency?: ScheduleFrequency;
+  filters?: Record<string, unknown>;
+}
+
+export interface UpdateReportScheduleInput {
+  name?: string;
+  format?: ReportFormat;
+  frequency?: ScheduleFrequency;
+  filters?: Record<string, unknown>;
+  active?: boolean;
+}
+
+export interface ReportRun {
+  id: string;
+  scheduleId?: string;
+  reportType: ScheduledReportType;
+  format: ReportFormat;
+  /** Authenticated /files URL of the generated artifact. */
+  fileUrl: string;
+  createdAt: string;
 }

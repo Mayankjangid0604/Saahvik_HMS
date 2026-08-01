@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import PDFDocument from "pdfkit";
 import { join } from "path";
+import type { GstBreakdown } from "../common/gst";
 
 /**
  * Shared PDF rendering (receipts + the four reports). Uses the bundled
@@ -14,6 +15,24 @@ export const FONT_BOLD = join(FONT_DIR, "NotoSans-Bold.ttf");
 const NAVY = "#1b2a4a";
 const GOLD = "#b08d57";
 
+/**
+ * Optional per-org brand colors (feature 17). Fall back to the house
+ * NAVY/GOLD when unset. Only hex strings are accepted; a malformed value is
+ * ignored via isHex() so a bad setting can never corrupt a PDF.
+ */
+export interface PdfBrand {
+  primary?: string | null;
+  accent?: string | null;
+}
+
+const isHex = (c: string | null | undefined): c is string =>
+  typeof c === "string" && /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(c);
+
+const brandColors = (brand?: PdfBrand) => ({
+  primary: isHex(brand?.primary) ? brand!.primary! : NAVY,
+  accent: isHex(brand?.accent) ? brand!.accent! : GOLD,
+});
+
 export interface PdfOrgHeader {
   hostelName: string;
   addressLine?: string;
@@ -21,6 +40,7 @@ export interface PdfOrgHeader {
   state?: string;
   pincode?: string;
   phone?: string;
+  gstin?: string;
 }
 
 export interface PdfTableColumn {
@@ -52,8 +72,9 @@ export class PdfService {
     });
   }
 
-  private header(doc: PDFKit.PDFDocument, org: PdfOrgHeader, title: string): void {
-    doc.rect(0, 0, doc.page.width, 74).fill(NAVY);
+  private header(doc: PDFKit.PDFDocument, org: PdfOrgHeader, title: string, brand?: PdfBrand): void {
+    const { primary, accent } = brandColors(brand);
+    doc.rect(0, 0, doc.page.width, 74).fill(primary);
     doc.fill("#ffffff").font("bold").fontSize(15);
     doc.text(org.hostelName || "Saahvik Hostel", 36, 20);
     doc.font("body").fontSize(8);
@@ -62,7 +83,8 @@ export class PdfService {
       .join(", ");
     if (address) doc.text(address, 36, 42);
     if (org.phone) doc.text(`Ph: ${org.phone}`, 36, 54);
-    doc.fill(GOLD).font("bold").fontSize(12);
+    if (org.gstin) doc.text(`GSTIN: ${org.gstin}`, 36, 64);
+    doc.fill(accent).font("bold").fontSize(12);
     doc.text(title.toUpperCase(), 36, 30, { width: doc.page.width - 72, align: "right" });
     doc.fill("#000000");
     doc.y = 92;
@@ -92,9 +114,13 @@ export class PdfService {
     rows: [string, string][];
     amountPaisa: number;
     refundedPaisa: number;
+    /** Brand colors (feature 17). Falls back to house colors when unset. */
+    brand?: PdfBrand;
+    /** GST breakdown (feature 8). Rendered only when `gst.enabled`. */
+    gst?: GstBreakdown;
   }): Promise<Buffer> {
     return this.render((doc) => {
-      this.header(doc, options.org, "Receipt");
+      this.header(doc, options.org, options.gst?.enabled ? "Tax Invoice" : "Receipt", options.brand);
 
       doc.font("bold").fontSize(10).text(options.receiptNo, 36, doc.y);
       doc.font("body").fontSize(9).text(options.paidAt, 36, doc.y - 12, {
@@ -113,11 +139,32 @@ export class PdfService {
         doc.moveDown(0.5);
       }
 
+      // GST breakdown (feature 8) — taxable value, CGST, SGST before the total.
+      const gst = options.gst;
+      if (gst?.enabled) {
+        doc.moveDown(0.4);
+        doc.moveTo(36, doc.y).lineTo(doc.page.width - 36, doc.y).stroke("#ececec");
+        doc.moveDown(0.5);
+        const half = gst.ratePercent / 2;
+        const gstLines: [string, string][] = [
+          ["Taxable value", pdfMoney(gst.taxablePaisa)],
+          [`CGST @ ${half}%`, pdfMoney(gst.cgstPaisa)],
+          [`SGST @ ${half}%`, pdfMoney(gst.sgstPaisa)],
+        ];
+        doc.fontSize(9);
+        for (const [label, value] of gstLines) {
+          const y = doc.y;
+          doc.fill("#6e6e6e").font("body").text(label, 36, y);
+          doc.fill("#000000").text(value, 36, y, { width: doc.page.width - 80, align: "right" });
+          doc.moveDown(0.5);
+        }
+      }
+
       doc.moveDown(0.6);
       const boxY = doc.y;
       doc.rect(36, boxY, doc.page.width - 72, 30).fill("#f8f5ef");
       doc.fill("#000000").font("bold").fontSize(11);
-      doc.text("Amount received", 44, boxY + 9);
+      doc.text(gst?.enabled ? "Total (incl. GST)" : "Amount received", 44, boxY + 9);
       doc.text(pdfMoney(options.amountPaisa - options.refundedPaisa), 36, boxY + 9, {
         width: doc.page.width - 80,
         align: "right",
@@ -142,10 +189,13 @@ export class PdfService {
     columns: PdfTableColumn[];
     rows: string[][];
     summary?: string;
+    /** Brand colors (feature 17). Falls back to house colors when unset. */
+    brand?: PdfBrand;
   }): Promise<Buffer> {
-    const { org, title, subtitle, columns, rows, summary } = options;
+    const { org, title, subtitle, columns, rows, summary, brand } = options;
+    const { primary } = brandColors(brand);
     return this.render((doc) => {
-      this.header(doc, org, title);
+      this.header(doc, org, title, brand);
       doc.font("body").fontSize(8).fill("#6e6e6e");
       doc.text(subtitle ?? `Generated on ${new Date().toLocaleDateString("en-IN")}`, 36, doc.y);
       doc.moveDown(0.8);
@@ -155,7 +205,7 @@ export class PdfService {
 
       const drawHeaderRow = () => {
         const y = doc.y;
-        doc.rect(startX, y, doc.page.width - 72, rowHeight).fill(NAVY);
+        doc.rect(startX, y, doc.page.width - 72, rowHeight).fill(primary);
         doc.fill("#ffffff").font("bold").fontSize(8);
         let x = startX + 5;
         for (const col of columns) {

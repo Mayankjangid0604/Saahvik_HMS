@@ -18,6 +18,14 @@ export async function updateOrgSettings(input: Partial<Org>): Promise<Org> {
   return data;
 }
 
+/** Upload the org logo (multipart). Returns the updated Org with a logoUrl. */
+export async function uploadOrgLogo(file: File): Promise<Org> {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await apiClient.post<Org>("/settings/org/logo", form);
+  return data;
+}
+
 // ---------- Admission form ----------
 
 export async function getAdmissionFormConfig(): Promise<AdmissionFormConfig> {
