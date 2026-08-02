@@ -43,9 +43,53 @@ export class ResidentsController {
     return this.residents.listAllActive(user);
   }
 
+  /**
+   * Expiring / expired documents report (feature 4). `?withinDays=30` default.
+   * Two-segment path — never collides with the `:id` route below.
+   */
+  @Get("documents/expiring")
+  expiringDocuments(@CurrentUser() user: AuthUser, @Query("withinDays") withinDays?: string) {
+    const days = withinDays ? Number(withinDays) : 30;
+    return this.residents.expiringDocuments(user, Number.isFinite(days) ? days : 30);
+  }
+
   @Get(":id")
   get(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.residents.get(user, id);
+  }
+
+  // ---------- categorized documents (feature 12) ----------
+
+  @Get(":id/documents")
+  listDocuments(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.residents.listDocuments(user, id);
+  }
+
+  @Post(":id/documents")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_FILE_SIZE_BYTES } }))
+  async addDocument(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() body: { category?: string; label?: string; expiryDate?: string },
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) throw ApiError.badRequest("No file provided");
+    const { key } = await this.files.store(user, file);
+    return this.residents.addDocument(user, id, {
+      category: body.category ?? "other",
+      fileKey: key,
+      label: body.label,
+      expiryDate: body.expiryDate,
+    });
+  }
+
+  @Delete(":id/documents/:docId")
+  deleteDocument(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Param("docId") docId: string,
+  ) {
+    return this.residents.deleteDocument(user, id, docId);
   }
 
   @Post()

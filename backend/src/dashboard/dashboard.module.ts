@@ -219,6 +219,29 @@ export class DashboardService {
       userHasPermission(this.prisma, user, "manageExpenses"),
     ]);
 
+    // Role-based dashboard (feature 15). Financial figures (collections, dues,
+    // advances, recent payments, profit) are shown to owners and to staff whose
+    // permissions[] grant it; a permission-less staff member sees only the
+    // operational dashboard. `expensesVisible` (profit/expense) stays a stricter
+    // gate on top of financial visibility, exactly as before.
+    const financialVisible =
+      expensesVisible || (await userHasPermission(this.prisma, user, "viewFinancials"));
+    const effectivePermissions =
+      user.role === "owner"
+        ? ["manageExpenses", "viewFinancials"]
+        : [
+            ...(expensesVisible ? ["manageExpenses"] : []),
+            ...(financialVisible && !expensesVisible ? ["viewFinancials"] : []),
+          ];
+
+    // Expiring-documents flag (feature 4) — operational, shown to every role.
+    // Counts active residents whose primary ID expires within 30 days (incl.
+    // already-expired). The full list is the /residents/documents/expiring report.
+    const docCutoff = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const expiringDocumentsCount = await this.prisma.resident.count({
+      where: { orgId, status: { not: "alumni" }, idDocExpiryDate: { not: null, lte: docCutoff } },
+    });
+
     // ----- occupancy (point in time), overall + per hostel -----
     const totalBeds = beds.length;
     const occupiedBeds = beds.filter((b) => b.status === "occupied").length;
@@ -299,6 +322,12 @@ export class DashboardService {
     return {
       range,
       rangeLabel: RANGE_LABELS[range],
+      // Role-based dashboard descriptor (feature 15) — the frontend renders the
+      // sections this role/permission set actually allows.
+      role: user.role,
+      permissions: effectivePermissions,
+      financialVisible,
+      expensesVisible,
       occupancy: {
         totalBeds,
         occupiedBeds,
@@ -307,29 +336,37 @@ export class DashboardService {
         occupancyPct: totalBeds === 0 ? 0 : Math.round((occupiedBeds / totalBeds) * 100),
         byProperty,
       },
-      dues: {
-        totalDuesPaisa: dues.reduce((s, d) => s + d.duesPaisa, 0),
-        residentsWithDues: dues.length,
-        highSeverityCount: dues.filter((d) => d.severity === "high").length,
-      },
-      collection: { totalPaisa: collection.total, byMethod: collection.byMethod },
       activeResidents,
-      advanceCollectedPaisa,
-      advanceBalanceTotalPaisa,
-      cashInflowPaisa: collection.byMethod.cash,
       complaints,
-      // Profit + expense figures reveal spending — only for owners / staff with
-      // manageExpenses. The frontend gates the Profit and Expense cards on this
-      // flag; the keys are genuinely absent (not zeroed) when hidden.
-      expensesVisible,
+      expiringDocumentsCount,
+      // ----- financial block: owners + financially-permitted staff only -----
+      // Keys are genuinely absent (not zeroed) when hidden, so a permission-less
+      // staff member's payload never carries money it isn't allowed to see.
+      ...(financialVisible
+        ? {
+            dues: {
+              totalDuesPaisa: dues.reduce((s, d) => s + d.duesPaisa, 0),
+              residentsWithDues: dues.length,
+              highSeverityCount: dues.filter((d) => d.severity === "high").length,
+            },
+            collection: { totalPaisa: collection.total, byMethod: collection.byMethod },
+            advanceCollectedPaisa,
+            advanceBalanceTotalPaisa,
+            cashInflowPaisa: collection.byMethod.cash,
+            collectionsChart,
+            recentPayments: recentPayments.map(toPaymentDto),
+            dueResidents: [...dues]
+              .sort((a, b) => b.monthsOverdue - a.monthsOverdue || b.duesPaisa - a.duesPaisa)
+              .slice(0, 8),
+          }
+        : {}),
+      // Profit + expense figures reveal spending — stricter gate (manageExpenses).
       ...(expensesVisible
         ? {
             netProfitPaisa: collection.total - expenseTotal,
             expense: { totalPaisa: expenseTotal, breakdown: expenseBreakdown },
           }
         : {}),
-      collectionsChart,
-      recentPayments: recentPayments.map(toPaymentDto),
       recentComplaints: openComplaints.map((c) => ({
         id: c.id,
         ticketNo: c.ticketNo,
@@ -352,16 +389,17 @@ export class DashboardService {
         })),
         attachments: [],
       })),
-      // Longest overdue first, then largest amount — top 8 for the dashboard list.
-      dueResidents: [...dues]
-        .sort((a, b) => b.monthsOverdue - a.monthsOverdue || b.duesPaisa - a.duesPaisa)
-        .slice(0, 8),
-      thisMonthFixed: {
-        collectionPaisa: monthCollection,
-        advancePaisa: monthAdvance,
-        // Net profit reveals expenses too — omit for users who can't see them.
-        ...(expensesVisible ? { netProfitPaisa: monthCollection - monthExpenseTotal } : {}),
-      },
+      // Fixed "this calendar month" card — financial, so gated like the rest.
+      ...(financialVisible
+        ? {
+            thisMonthFixed: {
+              collectionPaisa: monthCollection,
+              advancePaisa: monthAdvance,
+              // Net profit reveals expenses too — omit for users who can't see them.
+              ...(expensesVisible ? { netProfitPaisa: monthCollection - monthExpenseTotal } : {}),
+            },
+          }
+        : {}),
     };
   }
 

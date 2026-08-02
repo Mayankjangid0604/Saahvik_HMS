@@ -1,6 +1,8 @@
 import { RoomType, FeeMode } from "@prisma/client";
 import { Type } from "class-transformer";
 import {
+  IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -20,6 +22,11 @@ export class RoomListParamsDto extends ListParamsDto {
   @IsOptional()
   @IsString()
   type?: string; // RoomType | "all"
+
+  // Filter by maintenance-hold state (feature 3): "blocked" | "available".
+  @IsOptional()
+  @IsString()
+  availability?: string;
 }
 
 export class CreateRoomDto {
@@ -55,6 +62,12 @@ export class CreateRoomDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  // Amenity tags (feature 2). Sanitized against ROOM_AMENITIES server-side.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  amenities?: string[];
 }
 
 export class BulkAddRoomsDto {
@@ -112,6 +125,23 @@ export class UpdateRoomDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  amenities?: string[];
+}
+
+// Maintenance / block toggle (feature 3). blocked=true marks the room
+// temporarily unavailable; a reason is required when blocking.
+export class BlockRoomDto {
+  @IsBoolean()
+  blocked!: boolean;
+
+  @ValidateIf((o: BlockRoomDto) => o.blocked === true)
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
 }
 
 export class UpdateRoomFeeDto {

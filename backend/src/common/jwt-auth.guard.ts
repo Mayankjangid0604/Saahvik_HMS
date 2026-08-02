@@ -46,15 +46,52 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException("Invalid or expired token");
     }
 
-    // Password changes bump Owner.tokenVersion; tokens minted before then die here.
-    if (payload.role === "owner") {
-      const owner = await this.prisma.owner.findUnique({
-        where: { id: payload.sub },
-        select: { tokenVersion: true },
-      });
-      if (!owner || owner.tokenVersion !== (payload.tv ?? 0)) {
-        throw new UnauthorizedException("Token has been revoked");
+    // Per-role revocation via tokenVersion. Password changes / logout bump the
+    // subject's tokenVersion; tokens minted before then die here. Also verifies
+    // the subject still exists and its orgId matches the token's claim (defense
+    // in depth — a signed token whose subject was deleted/moved must not pass).
+    // Staff have no tokenVersion column, so they are not version-checked here
+    // (unchanged from before BG-2 — do not alter existing staff behavior).
+    switch (payload.role) {
+      case "owner": {
+        const owner = await this.prisma.owner.findUnique({
+          where: { id: payload.sub },
+          select: { tokenVersion: true, orgId: true },
+        });
+        if (!owner || owner.orgId !== payload.orgId || owner.tokenVersion !== (payload.tv ?? 0)) {
+          throw new UnauthorizedException("Token has been revoked");
+        }
+        break;
       }
+      case "guardian": {
+        const guardian = await this.prisma.guardian.findUnique({
+          where: { id: payload.sub },
+          select: { tokenVersion: true, orgId: true },
+        });
+        if (!guardian || guardian.orgId !== payload.orgId || guardian.tokenVersion !== (payload.tv ?? 0)) {
+          throw new UnauthorizedException("Token has been revoked");
+        }
+        break;
+      }
+      case "resident": {
+        const resident = await this.prisma.resident.findUnique({
+          where: { id: payload.sub },
+          select: { tokenVersion: true, orgId: true, passwordHash: true },
+        });
+        // A resident whose portal access was never enabled / was revoked
+        // (passwordHash cleared) cannot authenticate.
+        if (
+          !resident ||
+          resident.orgId !== payload.orgId ||
+          resident.passwordHash === null ||
+          resident.tokenVersion !== (payload.tv ?? 0)
+        ) {
+          throw new UnauthorizedException("Token has been revoked");
+        }
+        break;
+      }
+      case "staff":
+        break;
     }
 
     req.user = {

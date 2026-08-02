@@ -1,5 +1,5 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
-import { Prisma, ResidentStatus } from "@prisma/client";
+import { DocumentCategory, Prisma, ResidentStatus } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { ApiError } from "../common/api-error";
 import type { AuthUser } from "../common/auth-user";
@@ -40,6 +40,7 @@ export function toResidentDto(r: ResidentWithRefs) {
     email: r.email ?? undefined,
     photoUrl: r.photoKey ? fileUrl(r.photoKey) : undefined,
     idDocUrl: r.idDocKey ? fileUrl(r.idDocKey) : undefined,
+    idDocExpiryDate: r.idDocExpiryDate?.toISOString(),
     status: r.status,
     roomId: r.roomId ?? undefined,
     roomNumber: r.room?.number,
@@ -61,7 +62,38 @@ export function toResidentDto(r: ResidentWithRefs) {
     duesPaisa: effectiveDues(r.duesPaisa, r.advanceBalancePaisa),
     advanceBalancePaisa: r.advanceBalancePaisa,
     notes: r.notes ?? undefined,
+    // Medical / dietary (feature 7) — sensitive; returned only through the same
+    // authenticated resident endpoints as the rest of the record.
+    bloodGroup: r.bloodGroup ?? undefined,
+    allergies: r.allergies ?? undefined,
+    dietaryPreference: r.dietaryPreference ?? undefined,
+    medicalNotes: r.medicalNotes ?? undefined,
+    emergencyContactName: r.emergencyContactName ?? undefined,
+    emergencyContactPhone: r.emergencyContactPhone ?? undefined,
     admissionData: (r.admissionData ?? undefined) as Record<string, string> | undefined,
+  };
+}
+
+/** Frontend `ResidentDocument` shape (feature 12). fileKey served via /files. */
+export function toDocumentDto(d: {
+  id: string;
+  residentId: string;
+  category: DocumentCategory;
+  fileKey: string;
+  label: string | null;
+  expiryDate: Date | null;
+  uploadedByName: string;
+  uploadedAt: Date;
+}) {
+  return {
+    id: d.id,
+    residentId: d.residentId,
+    category: d.category,
+    fileUrl: fileUrl(d.fileKey),
+    label: d.label ?? undefined,
+    expiryDate: d.expiryDate?.toISOString(),
+    uploadedByName: d.uploadedByName,
+    uploadedAt: d.uploadedAt.toISOString(),
   };
 }
 
@@ -180,6 +212,15 @@ export class ResidentsService {
         });
         if (!room) throw ApiError.notFound("Room");
 
+        // Feature 3 — a room under a maintenance hold cannot receive residents.
+        if (room.blocked) {
+          throw new ApiError(
+            HttpStatus.CONFLICT,
+            "ROOM_BLOCKED",
+            `${room.number} is under a maintenance hold and cannot receive residents`,
+          );
+        }
+
         // #13 — Explicit capacity check (defense-in-depth)
         const occupiedCount = room.beds.filter((b) => b.status === "occupied").length;
         if (occupiedCount >= room.capacity) {
@@ -241,6 +282,13 @@ export class ResidentsService {
           monthlyFeePaisa,
           depositPaisa: dto.depositPaisa ?? 0,
           notes: dto.notes,
+          idDocExpiryDate: dto.idDocExpiryDate ? new Date(dto.idDocExpiryDate) : null,
+          bloodGroup: dto.bloodGroup,
+          allergies: dto.allergies,
+          dietaryPreference: dto.dietaryPreference,
+          medicalNotes: dto.medicalNotes,
+          emergencyContactName: dto.emergencyContactName,
+          emergencyContactPhone: dto.emergencyContactPhone,
           admissionData: admissionData as Prisma.InputJsonValue,
         },
         include: RESIDENT_INCLUDE,
@@ -343,6 +391,15 @@ export class ResidentsService {
         depositPaisa: dto.depositPaisa,
         notes: dto.notes,
         status: dto.status,
+        ...(dto.idDocExpiryDate !== undefined
+          ? { idDocExpiryDate: dto.idDocExpiryDate ? new Date(dto.idDocExpiryDate) : null }
+          : {}),
+        bloodGroup: dto.bloodGroup,
+        allergies: dto.allergies,
+        dietaryPreference: dto.dietaryPreference,
+        medicalNotes: dto.medicalNotes,
+        emergencyContactName: dto.emergencyContactName,
+        emergencyContactPhone: dto.emergencyContactPhone,
         admissionData: mergedAdmission as Prisma.InputJsonValue | undefined,
       },
       include: RESIDENT_INCLUDE,
@@ -535,6 +592,136 @@ export class ResidentsService {
     if (!existing) throw ApiError.notFound("Resident");
     await this.prisma.resident.update({ where: { id }, data: { idDocKey: key } });
     return this.get(user, id);
+  }
+
+  // ---------- categorized documents (feature 12) ----------
+
+  private async requireResident(orgId: string, residentId: string) {
+    const r = await this.prisma.resident.findFirst({ where: { id: residentId, orgId } });
+    if (!r) throw ApiError.notFound("Resident");
+    return r;
+  }
+
+  async listDocuments(user: AuthUser, residentId: string) {
+    await this.requireResident(user.orgId, residentId);
+    const docs = await this.prisma.residentDocument.findMany({
+      where: { orgId: user.orgId, residentId },
+      orderBy: { uploadedAt: "desc" },
+    });
+    return docs.map(toDocumentDto);
+  }
+
+  /**
+   * Attach a categorized document (feature 12). The file must already be stored
+   * via FilesService (the controller uploads it, then passes the key). category
+   * is validated against DocumentCategory; expiryDate feeds the expiry report.
+   */
+  async addDocument(
+    user: AuthUser,
+    residentId: string,
+    input: { category: string; fileKey: string; label?: string; expiryDate?: string },
+  ) {
+    await this.requireResident(user.orgId, residentId);
+    const category = (Object.values(DocumentCategory) as string[]).includes(input.category)
+      ? (input.category as DocumentCategory)
+      : DocumentCategory.other;
+    const doc = await this.prisma.residentDocument.create({
+      data: {
+        orgId: user.orgId,
+        residentId,
+        category,
+        fileKey: input.fileKey,
+        label: input.label,
+        expiryDate: input.expiryDate ? new Date(input.expiryDate) : null,
+        uploadedByName: user.name,
+      },
+    });
+    await this.audit.log(user, {
+      action: "added_resident_document",
+      entityType: "resident",
+      entityId: residentId,
+      entityLabel: category,
+      details: { documentId: doc.id, category, hasExpiry: !!input.expiryDate },
+    });
+    return toDocumentDto(doc);
+  }
+
+  async deleteDocument(user: AuthUser, residentId: string, docId: string) {
+    const doc = await this.prisma.residentDocument.findFirst({
+      where: { id: docId, residentId, orgId: user.orgId },
+    });
+    if (!doc) throw ApiError.notFound("Document");
+    await this.prisma.residentDocument.delete({ where: { id: doc.id } });
+    await this.audit.log(user, {
+      action: "deleted_resident_document",
+      entityType: "resident",
+      entityId: residentId,
+      entityLabel: doc.category,
+      details: { documentId: docId },
+    });
+    return { ok: true };
+  }
+
+  /**
+   * Expiring / expired documents report (feature 4). Unifies the primary ID
+   * (Resident.idDocExpiryDate) and categorized ResidentDocument rows. Returns
+   * everything with an expiry on or before `withinDays` from today (expired
+   * items included, negative daysUntilExpiry). Alumni excluded.
+   */
+  async expiringDocuments(user: AuthUser, withinDays = 30) {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + withinDays * 24 * 60 * 60 * 1000);
+    const dayMs = 24 * 60 * 60 * 1000;
+    const daysUntil = (d: Date) => Math.ceil((d.getTime() - now.getTime()) / dayMs);
+
+    const [residents, docs] = await this.prisma.$transaction([
+      this.prisma.resident.findMany({
+        where: {
+          orgId: user.orgId,
+          status: { not: "alumni" },
+          idDocExpiryDate: { not: null, lte: cutoff },
+        },
+        select: { id: true, name: true, phone: true, idType: true, idDocExpiryDate: true },
+      }),
+      this.prisma.residentDocument.findMany({
+        where: { orgId: user.orgId, expiryDate: { not: null, lte: cutoff } },
+        include: { resident: { select: { name: true, phone: true, status: true } } },
+      }),
+    ]);
+
+    const items = [
+      ...residents.map((r) => ({
+        residentId: r.id,
+        residentName: r.name,
+        phone: r.phone,
+        source: "id_doc" as const,
+        category: r.idType,
+        label: "Primary ID document",
+        expiryDate: r.idDocExpiryDate!.toISOString(),
+        daysUntilExpiry: daysUntil(r.idDocExpiryDate!),
+        expired: r.idDocExpiryDate!.getTime() < now.getTime(),
+      })),
+      ...docs
+        .filter((d) => d.resident.status !== "alumni")
+        .map((d) => ({
+          residentId: d.residentId,
+          residentName: d.resident.name,
+          phone: d.resident.phone,
+          source: "document" as const,
+          category: d.category,
+          label: d.label ?? d.category,
+          expiryDate: d.expiryDate!.toISOString(),
+          daysUntilExpiry: daysUntil(d.expiryDate!),
+          expired: d.expiryDate!.getTime() < now.getTime(),
+        })),
+    ].sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+
+    return {
+      withinDays,
+      total: items.length,
+      expiredCount: items.filter((i) => i.expired).length,
+      items,
+    };
   }
 
   // ---------- caps & validation ----------

@@ -10,6 +10,12 @@ import { ACTIVE_RESIDENT_CAP } from "../residents/residents.service";
 import { TOTAL_LOGIN_LIMIT } from "../staff/staff.service";
 import { DEFAULT_ADMISSION_FIELDS } from "./admission-defaults";
 
+/**
+ * Feature 6 — max org-defined custom admission fields (fields with
+ * isDefault=false). Beginner-tier cap; documented here as the single source.
+ */
+export const MAX_CUSTOM_ADMISSION_FIELDS = 10;
+
 export interface AdmissionFieldInput {
   key: string;
   label: string;
@@ -60,6 +66,12 @@ export class SettingsService {
       phone: string;
       email: string;
       gstin: string;
+      // GST config (feature 8) + branding colors (feature 17).
+      gstEnabled: boolean;
+      gstRatePercent: number;
+      gstInclusive: boolean;
+      themeColorPrimary: string;
+      themeColorAccent: string;
       setupComplete: boolean;
     }>,
   ) {
@@ -75,6 +87,11 @@ export class SettingsService {
         phone: input.phone,
         email: input.email,
         gstin: input.gstin,
+        gstEnabled: input.gstEnabled,
+        gstRatePercent: input.gstRatePercent,
+        gstInclusive: input.gstInclusive,
+        themeColorPrimary: input.themeColorPrimary,
+        themeColorAccent: input.themeColorAccent,
         onboardingCompleted: input.setupComplete,
       },
     });
@@ -84,6 +101,25 @@ export class SettingsService {
       entityId: org.id,
       entityLabel: org.name,
       details: { changes: Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)) },
+    });
+    return toOrgDto(org);
+  }
+
+  /**
+   * Set the org logo (feature 17). The file is already stored via FilesService
+   * (the controller uploads it, then passes the key); we just record the key,
+   * which toOrgDto exposes as an authenticated /files URL.
+   */
+  async setLogo(user: AuthUser, key: string) {
+    const org = await this.prisma.organization.update({
+      where: { id: user.orgId },
+      data: { logoKey: key },
+    });
+    await this.audit.log(user, {
+      action: "updated_org_logo",
+      entityType: "organization",
+      entityId: org.id,
+      entityLabel: org.name,
     });
     return toOrgDto(org);
   }
@@ -129,7 +165,25 @@ export class SettingsService {
     if (new Set(keys).size !== keys.length) {
       throw ApiError.badRequest("Duplicate field keys in admission form");
     }
+    // Feature 6 — cap org-defined CUSTOM fields (isDefault === false). The
+    // built-in default fields don't count toward the cap. This is the single
+    // custom-fields mechanism (we reuse AdmissionFieldDefinition rather than
+    // inventing a second one); keep the cap here as the documented limit.
+    const customCount = fields.filter((f) => !f.isDefault).length;
+    if (customCount > MAX_CUSTOM_ADMISSION_FIELDS) {
+      throw ApiError.badRequest(
+        `You can define at most ${MAX_CUSTOM_ADMISSION_FIELDS} custom fields (you have ${customCount})`,
+        { limit: MAX_CUSTOM_ADMISSION_FIELDS, count: customCount },
+      );
+    }
     for (const f of fields) {
+      // Feature 19 (strengthening) — key must be a safe identifier so it can key
+      // into Resident.admissionData Json without collisions/injection surprises.
+      if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(f.key)) {
+        throw ApiError.badRequest(
+          `Field key "${f.key}" must start with a letter and contain only letters, numbers, or underscores`,
+        );
+      }
       if (f.type === "select" && (!f.options || f.options.length === 0)) {
         throw ApiError.badRequest(`Field "${f.label}" needs at least one option`);
       }

@@ -7,6 +7,7 @@ import { effectiveDues } from "../common/dues";
 import { pageArgs, paginated, type Paginated } from "../common/pagination";
 import { SequenceService } from "../common/sequence.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { computeGst } from "../common/gst";
 import { PdfService, pdfMoney } from "../pdf/pdf.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type { PaymentListParamsDto, RecordPaymentDto, RefundPaymentDto } from "./dto";
@@ -300,6 +301,18 @@ export class PaymentsService {
     ];
     if (p.notes) rows.push(["Notes", p.notes]);
 
+    // GST breakdown (feature 8) — computed only when the org has GST enabled.
+    // The stored payment amount is treated as the charged total; whether that
+    // is tax-inclusive or exclusive is org config. Net of refunds so the
+    // breakdown matches the "Total" line shown below it.
+    const netPaisa = p.amountPaisa - p.refundedPaisa;
+    const gst = computeGst(netPaisa, {
+      gstEnabled: org.gstEnabled,
+      gstRatePercent: org.gstRatePercent,
+      gstInclusive: org.gstInclusive,
+      gstin: org.gstin,
+    });
+
     return this.pdf.receipt({
       org: {
         hostelName: org.hostelName ?? org.name,
@@ -308,12 +321,15 @@ export class PaymentsService {
         state: org.state ?? undefined,
         pincode: org.pincode ?? undefined,
         phone: org.phone ?? undefined,
+        gstin: org.gstEnabled ? (org.gstin ?? undefined) : undefined,
       },
       receiptNo: p.receiptNo,
       paidAt: p.paidAt.toLocaleString("en-IN"),
       rows,
       amountPaisa: p.amountPaisa,
       refundedPaisa: p.refundedPaisa,
+      brand: { primary: org.themeColorPrimary, accent: org.themeColorAccent },
+      gst,
     });
   }
 

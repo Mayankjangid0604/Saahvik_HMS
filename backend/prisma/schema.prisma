@@ -171,6 +171,94 @@ enum ContactRequestStatus {
   CLOSED
 }
 
+// ---------- Beginner phase (BG-1) enums ----------
+
+// Category for a categorized resident document upload (feature 12).
+enum DocumentCategory {
+  id_proof
+  admission_form
+  medical_certificate
+  agreement
+  photo
+  other
+}
+
+// A pre-booking hold on a bed/room before an actual check-in (feature 5). A
+// reservation NEVER sets Bed.status = occupied — it is a distinct state that
+// only becomes an occupied bed when converted into a real Resident.
+enum ReservationStatus {
+  held // active hold, blocks the bed from being double-booked
+  confirmed // deposit taken / firmed up, still not checked in
+  converted // turned into an actual Resident (bed now occupied)
+  cancelled
+  expired // holdUntil passed without conversion
+}
+
+// Vendor + purchase categories (feature 9).
+enum VendorCategory {
+  groceries
+  maintenance
+  utilities
+  furniture
+  services
+  supplies
+  other
+}
+
+// Entity a saved search / global search targets (features 10, 11).
+enum SearchEntity {
+  residents
+  rooms
+  staff
+  complaints
+  global
+}
+
+// Report scheduling (feature 16).
+enum ScheduledReportType {
+  occupancy
+  dues
+  residents
+  monthly_collection
+  staff
+}
+
+enum ReportFormat {
+  pdf
+  xlsx
+}
+
+enum ScheduleFrequency {
+  daily
+  weekly
+  monthly
+}
+
+// Basic approval workflow (feature 18) — intentionally simple, owner sign-off.
+enum ApprovalType {
+  expense
+  purchase
+  discount
+  refund
+  room_block
+  other
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+// ---------- Guardian + Resident self-service (BG-2) enums ----------
+
+// A portal invite is always tied to a specific resident and issued by
+// owner/staff. Invite-only (no self-signup) — see the phase report for why.
+enum PortalInviteKind {
+  guardian
+  resident
+}
+
 // ---------- core tenancy ----------
 
 model Organization {
@@ -184,6 +272,21 @@ model Organization {
   phone                  String?
   email                  String?
   gstin                  String?
+  // GST-compliant invoicing config (feature 8). gstEnabled toggles the GST
+  // breakdown on invoices/PDFs; gstRatePercent is a whole-number percent
+  // (0/5/12/18/28 — GST slabs are integers). gstInclusive = stored line-item
+  // amounts already include tax (tax is extracted) vs. exclusive (tax added on
+  // top). Additive: existing invoice generation is unaffected when gstEnabled
+  // is false (the default).
+  gstEnabled             Boolean      @default(false)
+  gstRatePercent         Int          @default(0)
+  gstInclusive           Boolean      @default(false)
+  // Branding (feature 17): logoKey is a /files storage key (served only through
+  // the authenticated file endpoint, like every other upload). Theme colors are
+  // hex strings used to reskin invoice/receipt PDFs first, UI chrome later.
+  logoKey                String?
+  themeColorPrimary      String?
+  themeColorAccent       String?
   plan                   Plan         @default(basic)
   planBillingCycle       BillingCycle @default(monthly)
   planStartDate          DateTime?
@@ -211,6 +314,11 @@ model Organization {
   discounts         Discount[]
   expenseCategories ExpenseCategory[]
   expenses          Expense[]
+  reservations      Reservation[]
+  vendors           Vendor[]
+  purchaseRecords   PurchaseRecord[]
+  residentDocuments ResidentDocument[]
+  guardians         Guardian[]
 }
 
 model Owner {
@@ -313,15 +421,24 @@ model Room {
   feeMode             FeeMode  @default(variable)
   fixedFeeAmountPaisa Int?
   monthlyRentPaisa    Int      @default(0)
+  // Room amenity tags (feature 2), e.g. ["ac", "attached_bathroom", "balcony"].
+  // Free-form strings; a hardcoded starter set (ROOM_AMENITIES) validates input
+  // in v1, extensible to an org-configurable list later.
+  amenities           String[] @default([])
+  // Maintenance / temporary block (feature 3). A blocked room is distinct from
+  // occupancy and cannot receive new residents (enforced in assignment logic).
+  blocked             Boolean  @default(false)
+  blockedReason       String?
   notes               String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  org       Organization @relation(fields: [orgId], references: [id])
-  hostel    Hostel       @relation(fields: [hostelId], references: [id])
-  wing      Wing?        @relation(fields: [wingId], references: [id])
-  beds      Bed[]
-  residents Resident[]
+  org          Organization  @relation(fields: [orgId], references: [id])
+  hostel       Hostel        @relation(fields: [hostelId], references: [id])
+  wing         Wing?         @relation(fields: [wingId], references: [id])
+  beds         Bed[]
+  residents    Resident[]
+  reservations Reservation[]
 
   @@unique([orgId, number])
 }
@@ -336,9 +453,10 @@ model Bed {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  org      Organization @relation(fields: [orgId], references: [id])
-  room     Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  resident Resident?    @relation(fields: [residentId], references: [id])
+  org          Organization  @relation(fields: [orgId], references: [id])
+  room         Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  resident     Resident?     @relation(fields: [residentId], references: [id])
+  reservations Reservation[]
 
   @@unique([roomId, label])
 }
@@ -346,50 +464,75 @@ model Bed {
 // ---------- residents ----------
 
 model Resident {
-  id                   String         @id @default(uuid())
-  orgId                String
-  name                 String
-  phone                String
-  email                String?
-  photoKey             String? // storage key — served only via authenticated /files/:key
-  idDocKey             String?
-  status               ResidentStatus @default(active)
-  roomId               String?
-  joinDate             DateTime
-  exitDate             DateTime?
-  guardianName         String         @default("")
-  guardianPhone        String         @default("")
-  permanentAddress     String         @default("")
-  idType               IdDocumentType @default(aadhaar)
-  idNumber             String         @default("")
-  occupation           Occupation     @default(student)
-  institutionOrCompany String?
-  monthlyFeePaisa      Int            @default(0)
-  depositPaisa         Int            @default(0)
-  duesPaisa            Int            @default(0)
+  id                     String         @id @default(uuid())
+  orgId                  String
+  name                   String
+  phone                  String
+  email                  String?
+  photoKey               String? // storage key — served only via authenticated /files/:key
+  idDocKey               String?
+  // Expiry of the primary ID document (feature 4). Nullable — many IDs (e.g.
+  // Aadhaar) never expire. Surfaced by the expiring-documents report/flag.
+  idDocExpiryDate        DateTime?
+  status                 ResidentStatus @default(active)
+  roomId                 String?
+  joinDate               DateTime
+  exitDate               DateTime?
+  // DEPRECATED (BG-2): flat guardian strings are superseded by the Guardian
+  // model + GuardianResident join. Kept in place (NOT dropped, no backfill this
+  // phase) for backward compatibility with existing records and BG-1 code.
+  guardianName           String         @default("")
+  guardianPhone          String         @default("")
+  permanentAddress       String         @default("")
+  idType                 IdDocumentType @default(aadhaar)
+  idNumber               String         @default("")
+  occupation             Occupation     @default(student)
+  institutionOrCompany   String?
+  monthlyFeePaisa        Int            @default(0)
+  depositPaisa           Int            @default(0)
+  duesPaisa              Int            @default(0)
   // Prepaid rent balance: rent overpayments land here and net against dues on
   // read (see common/dues.ts effectiveDues). Distinct from depositPaisa/Deposit
   // (refundable security deposit) — this is credit toward future rent.
-  advanceBalancePaisa  Int            @default(0)
+  advanceBalancePaisa    Int            @default(0)
   // "YYYY-MM" (Asia/Kolkata) of the last month this resident's rent was
   // accrued into duesPaisa by the monthly cron (finance/dues-accrual.service.ts).
   // Null until the first accrual run. Guards against double-accrual on
   // cron restart/overlap.
-  lastDuesAccrualPeriod String?
-  notes                String?
+  lastDuesAccrualPeriod  String?
+  notes                  String?
+  // Medical / dietary info (feature 7). Sensitive PII — served through the same
+  // resident endpoints/authorization as the rest of the resident record; no new
+  // exposure surface. All nullable; kept inline on Resident because the data is
+  // 1:1 with the resident, not naturally a separate table.
+  bloodGroup             String?
+  allergies              String?
+  dietaryPreference      String?
+  medicalNotes           String?
+  emergencyContactName   String?
+  emergencyContactPhone  String?
   // Answers to the org's configurable admission form, keyed by field key.
   // Validated at write time against AdmissionFieldDefinition rows.
-  admissionData        Json?
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  admissionData          Json?
+  // Resident self-service login (BG-2). All null/default until the resident
+  // accepts a portal invite. Same bcrypt + tokenVersion revocation pattern as
+  // Owner. A resident with a null passwordHash cannot log in to the portal.
+  passwordHash           String?
+  tokenVersion           Int            @default(0)
+  passwordResetToken     String?
+  passwordResetExpiresAt DateTime?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
 
-  org        Organization @relation(fields: [orgId], references: [id])
-  room       Room?        @relation(fields: [roomId], references: [id])
+  org        Organization       @relation(fields: [orgId], references: [id])
+  room       Room?              @relation(fields: [roomId], references: [id])
   bed        Bed?
   payments   Payment[]
   complaints Complaint[]
   invoices   Invoice[]
   deposits   Deposit[]
+  documents  ResidentDocument[]
+  guardians  GuardianResident[]
 
   @@unique([orgId, phone])
   @@index([orgId, status])
@@ -417,22 +560,22 @@ model AdmissionFieldDefinition {
 // ---------- finance ----------
 
 model Payment {
-  id             String        @id @default(uuid())
-  orgId          String
-  receiptNo      String // RCP-YYYY-#### sequential per org per year
-  residentId     String
-  amountPaisa    Int
-  method         PaymentMethod
-  type           PaymentType
-  status         PaymentStatus @default(completed)
-  paidAt         DateTime
-  periodMonth    String? // "2026-07" for rent
-  refundedPaisa  Int           @default(0)
+  id                  String        @id @default(uuid())
+  orgId               String
+  receiptNo           String // RCP-YYYY-#### sequential per org per year
+  residentId          String
+  amountPaisa         Int
+  method              PaymentMethod
+  type                PaymentType
+  status              PaymentStatus @default(completed)
+  paidAt              DateTime
+  periodMonth         String? // "2026-07" for rent
+  refundedPaisa       Int           @default(0)
   // How much of this (rent) payment exceeded dues and became advance balance,
   // captured at write time so dashboard "advance collected" is an exact fact.
-  advanceAppliedPaisa Int      @default(0)
-  notes          String?
-  recordedByName String
+  advanceAppliedPaisa Int           @default(0)
+  notes               String?
+  recordedByName      String
 
   org      Organization @relation(fields: [orgId], references: [id])
   resident Resident     @relation(fields: [residentId], references: [id])
@@ -580,6 +723,7 @@ model Expense {
 
   org      Organization    @relation(fields: [orgId], references: [id])
   category ExpenseCategory @relation(fields: [categoryId], references: [id])
+  purchase PurchaseRecord?
 
   @@index([orgId, spentAt])
   @@index([orgId, categoryId])
@@ -703,4 +847,257 @@ model ContactRequest {
   createdAt  DateTime             @default(now())
 
   @@index([status, createdAt])
+}
+
+// ---------- Beginner phase (BG-1) models ----------
+
+// Categorized resident document with optional expiry (features 4 & 12). The
+// primary ID lives on Resident.idDocKey/idDocExpiryDate; this table holds any
+// number of additional categorized documents (medical certificate, agreement…).
+// fileKey is a /files storage key served only through the authenticated
+// endpoint — never a raw path.
+model ResidentDocument {
+  id             String           @id @default(uuid())
+  orgId          String
+  residentId     String
+  category       DocumentCategory @default(other)
+  fileKey        String
+  label          String?
+  expiryDate     DateTime?
+  uploadedByName String
+  uploadedAt     DateTime         @default(now())
+
+  org      Organization @relation(fields: [orgId], references: [id])
+  resident Resident     @relation(fields: [residentId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, residentId])
+  @@index([orgId, category])
+  @@index([orgId, expiryDate])
+}
+
+// Pre-booking hold (feature 5). Distinct from the Bed/Resident 1:1 binding: a
+// reservation records intent and (optionally) targets a specific bed, but does
+// not occupy it. residentId is null until conversion produces a real Resident.
+model Reservation {
+  id              String            @id @default(uuid())
+  orgId           String
+  roomId          String
+  bedId           String?
+  residentName    String
+  residentPhone   String
+  // Set only after the reservation is converted into an actual Resident.
+  residentId      String?
+  status          ReservationStatus @default(held)
+  expectedCheckIn DateTime
+  // Auto-expiry cutoff for the hold; null = no auto-expiry.
+  holdUntil       DateTime?
+  monthlyFeePaisa Int               @default(0)
+  depositPaisa    Int               @default(0)
+  notes           String?
+  createdByName   String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  org  Organization @relation(fields: [orgId], references: [id])
+  room Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  bed  Bed?         @relation(fields: [bedId], references: [id])
+
+  @@index([orgId, status])
+  @@index([orgId, roomId])
+}
+
+// Vendor directory (feature 9). Kept separate from Expense — a vendor is a
+// standing counterparty, an expense is a booked outflow.
+model Vendor {
+  id            String         @id @default(uuid())
+  orgId         String
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  category      VendorCategory @default(other)
+  active        Boolean        @default(true)
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  org       Organization     @relation(fields: [orgId], references: [id])
+  purchases PurchaseRecord[]
+
+  @@unique([orgId, name])
+  @@index([orgId, active])
+}
+
+// Purchase record (feature 9). Amount in integer paisa. Optional 1:1 link to a
+// booked Expense (expenseId) so a purchase can flow into the finance ledger
+// without merging the two concepts.
+model PurchaseRecord {
+  id             String         @id @default(uuid())
+  orgId          String
+  vendorId       String
+  label          String
+  amountPaisa    Int
+  category       VendorCategory @default(other)
+  purchasedAt    DateTime
+  invoiceRef     String?
+  expenseId      String?        @unique
+  notes          String?
+  attachmentKey  String? // storage key — served only via authenticated /files/:key
+  recordedByName String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  org     Organization @relation(fields: [orgId], references: [id])
+  vendor  Vendor       @relation(fields: [vendorId], references: [id])
+  expense Expense?     @relation(fields: [expenseId], references: [id])
+
+  @@index([orgId, purchasedAt])
+  @@index([orgId, vendorId])
+}
+
+// Per-user saved search (feature 11). Scoped to the user (userId + userType),
+// NOT shared across the org. Follows the light orgId-as-plain-field pattern
+// (like NotificationPreference / AuditLogEntry) — no Organization back-relation.
+model SavedSearch {
+  id        String       @id @default(uuid())
+  orgId     String
+  userId    String
+  userType  String // "owner" | "staff"
+  name      String
+  entity    SearchEntity @default(global)
+  query     Json // { term?, filters? } — opaque to the backend, replayed by the client
+  createdAt DateTime     @default(now())
+
+  @@index([orgId, userId, userType])
+}
+
+// Report scheduling (feature 16). Stores schedule config only; the runner
+// GENERATES AND STORES a ReportRun — it does NOT deliver (email/WhatsApp is
+// Phase BG-5). nextRunAt is advanced by the scheduler after each run.
+model ReportSchedule {
+  id              String              @id @default(uuid())
+  orgId           String
+  createdByUserId String
+  name            String
+  reportType      ScheduledReportType
+  format          ReportFormat        @default(pdf)
+  frequency       ScheduleFrequency   @default(weekly)
+  filters         Json?
+  active          Boolean             @default(true)
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  runs ReportRun[]
+
+  @@index([orgId, active])
+  @@index([nextRunAt])
+}
+
+// A generated-and-stored report artifact (feature 16 "generate and store"
+// stub for delivery). fileKey is a /files storage key.
+model ReportRun {
+  id         String              @id @default(uuid())
+  orgId      String
+  scheduleId String?
+  reportType ScheduledReportType
+  format     ReportFormat
+  fileKey    String
+  createdAt  DateTime            @default(now())
+
+  schedule ReportSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt])
+}
+
+// Basic single-step approval (feature 18). A staff member raises a request; an
+// owner approves or rejects. Intentionally NOT a generic workflow engine.
+model ApprovalRequest {
+  id                String         @id @default(uuid())
+  orgId             String
+  type              ApprovalType
+  status            ApprovalStatus @default(pending)
+  requestedByUserId String
+  requestedByName   String
+  entityType        String
+  entityId          String?
+  summary           String
+  // Snapshot of the pending action's payload, applied verbatim on approval.
+  payload           Json?
+  decidedByUserId   String?
+  decidedByName     String?
+  decisionNote      String?
+  decidedAt         DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([orgId, status])
+  @@index([orgId, createdAt])
+}
+
+// ---------- Guardian + Resident self-service (BG-2) ----------
+
+// A guardian login account. phone is the login identifier (unique per org).
+// Same bcrypt + tokenVersion revocation pattern as Owner — no weaker mechanism.
+// A guardian is linked to one or more residents via GuardianResident; resident
+// scoping is ALWAYS resolved server-side from that join, never trusted from the
+// client or the token beyond the guardianId in `sub`.
+model Guardian {
+  id                     String    @id @default(uuid())
+  orgId                  String
+  name                   String
+  phone                  String
+  email                  String?
+  passwordHash           String
+  tokenVersion           Int       @default(0)
+  passwordResetToken     String?
+  passwordResetExpiresAt DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  org       Organization       @relation(fields: [orgId], references: [id])
+  residents GuardianResident[]
+
+  @@unique([orgId, phone])
+  @@index([orgId])
+}
+
+// Many-to-many link between guardians and residents (siblings → one guardian,
+// multiple residents; a resident may in principle have more than one guardian).
+model GuardianResident {
+  id         String   @id @default(uuid())
+  orgId      String
+  guardianId String
+  residentId String
+  createdAt  DateTime @default(now())
+
+  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  resident Resident @relation(fields: [residentId], references: [id], onDelete: Cascade)
+
+  @@unique([guardianId, residentId])
+  @@index([orgId, residentId])
+  @@index([orgId, guardianId])
+}
+
+// Owner/staff-issued portal invite, tied to a specific resident. The raw token
+// is emailed/handed out once; only its sha256 hash is stored (DB read access
+// must not grant account takeover — mirrors Owner.passwordResetToken). Consumed
+// exactly once (usedAt) at signup.
+model PortalInvite {
+  id              String           @id @default(uuid())
+  orgId           String
+  kind            PortalInviteKind
+  residentId      String
+  phone           String?
+  tokenHash       String
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdByUserId String
+  createdByName   String
+  createdAt       DateTime         @default(now())
+  @@index([orgId, residentId])
+  @@index([tokenHash])
+  @@index([tokenHash])
 }

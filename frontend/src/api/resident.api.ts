@@ -3,8 +3,10 @@ import type {
   BulkImportResult,
   BulkImportRow,
   CreateResidentInput,
+  ExpiringDocumentsReport,
   Paginated,
   Resident,
+  ResidentDocument,
   ResidentListParams,
 } from "./types";
 import { apiClient } from "./client";
@@ -48,6 +50,50 @@ export async function checkoutResident(id: string, exitDate: string): Promise<Re
 export async function importResidents(mappedRows: BulkImportRow[]): Promise<BulkImportResult> {
   const { data } = await apiClient.post<BulkImportResult>("/residents/import", {
     rows: mappedRows,
+  });
+  return data;
+}
+
+// ---------- Categorized documents (feature 12) ----------
+
+export async function listResidentDocuments(residentId: string): Promise<ResidentDocument[]> {
+  const { data } = await apiClient.get<ResidentDocument[]>(`/residents/${residentId}/documents`);
+  return data;
+}
+
+/** Upload a categorized document as multipart form-data. */
+export async function uploadResidentDocument(
+  residentId: string,
+  file: File,
+  meta: { category: string; label?: string; expiryDate?: string },
+): Promise<ResidentDocument> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("category", meta.category);
+  if (meta.label !== undefined) form.append("label", meta.label);
+  if (meta.expiryDate !== undefined) form.append("expiryDate", meta.expiryDate);
+  const { data } = await apiClient.post<ResidentDocument>(
+    `/residents/${residentId}/documents`,
+    form,
+  );
+  return data;
+}
+
+export async function deleteResidentDocument(
+  residentId: string,
+  docId: string,
+): Promise<{ ok: boolean }> {
+  const { data } = await apiClient.delete<{ ok: boolean }>(
+    `/residents/${residentId}/documents/${docId}`,
+  );
+  return data;
+}
+
+// ---------- Document expiry report (feature 4) ----------
+
+export async function getExpiringDocuments(withinDays?: number): Promise<ExpiringDocumentsReport> {
+  const { data } = await apiClient.get<ExpiringDocumentsReport>("/residents/documents/expiring", {
+    params: withinDays !== undefined ? { withinDays } : undefined,
   });
   return data;
 }

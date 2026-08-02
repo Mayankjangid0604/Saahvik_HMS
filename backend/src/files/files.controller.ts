@@ -11,7 +11,7 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiError } from "../common/api-error";
 import type { AuthUser } from "../common/auth-user";
-import { CurrentUser } from "../common/decorators";
+import { CurrentUser, Roles } from "../common/decorators";
 import { FilesService, MAX_FILE_SIZE_BYTES } from "./files.service";
 
 /**
@@ -30,7 +30,13 @@ export class FilesController {
     return this.files.store(user, file);
   }
 
-  /** Authenticated file fetch. `:orgId/:name` mirrors the storage key. */
+  /**
+   * Authenticated file fetch. `:orgId/:name` mirrors the storage key. Portal
+   * roles are admitted here (owner/staff too) but FilesService.open scopes a
+   * resident/guardian to ONLY their own resident's files. Upload (POST) stays
+   * staff-side only (default-deny) — the portal never writes files.
+   */
+  @Roles("owner", "staff", "resident", "guardian")
   @Get("files/:orgId/:name")
   async serve(
     @CurrentUser() user: AuthUser,

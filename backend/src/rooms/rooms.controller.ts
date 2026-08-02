@@ -13,6 +13,7 @@ import type { AuthUser } from "../common/auth-user";
 import { CurrentUser, Roles } from "../common/decorators";
 import { ValidatedBody, ValidatedQuery } from "../common/validated";
 import {
+  BlockRoomDto,
   BulkAddRoomsDto,
   CreateRoomDto,
   RoomListParamsDto,
@@ -34,6 +35,12 @@ export class RoomsController {
   @Get("all")
   listAll(@CurrentUser() user: AuthUser) {
     return this.rooms.listAll(user);
+  }
+
+  /** Floor-level grouping + per-floor occupancy summary (feature 1). */
+  @Get("floors")
+  floors(@CurrentUser() user: AuthUser) {
+    return this.rooms.floorSummary(user);
   }
 
   @Post()
@@ -58,6 +65,17 @@ export class RoomsController {
     @ValidatedBody(UpdateRoomDto) dto: UpdateRoomDto,
   ) {
     return this.rooms.update(user, id, dto);
+  }
+
+  /** Toggle a maintenance hold on a room (feature 3). Owner only. */
+  @Put(":id/block")
+  @Roles("owner")
+  setBlocked(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @ValidatedBody(BlockRoomDto) dto: BlockRoomDto,
+  ) {
+    return this.rooms.setBlocked(user, id, dto);
   }
 
   @Put(":id/fee-settings")
