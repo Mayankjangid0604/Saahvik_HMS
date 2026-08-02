@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -10,7 +10,13 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
 
-import { LandingPage } from "@/pages/Landing/LandingPage";
+// Route-level split, and deliberately so: the landing page is the only thing
+// that pulls in Motion and the Cormorant display face, and none of that should
+// reach the authenticated app's bundle. Keep this lazy.
+const LandingPage = lazy(() =>
+  import("@/pages/Landing/LandingPage").then((m) => ({ default: m.LandingPage })),
+);
+
 import { LoginPage } from "@/features/auth/LoginPage";
 import { SignupPage } from "@/features/auth/SignupPage";
 import { ForgotPasswordPage } from "@/features/auth/ForgotPasswordPage";
@@ -60,7 +66,16 @@ const queryClient = new QueryClient({
 });
 
 const router = createBrowserRouter([
-  { path: "/", element: <LandingPage /> },
+  {
+    path: "/",
+    element: (
+      // Ivory backdrop matches the landing page's own background, so the
+      // chunk fetch reads as a beat of nothing rather than a white flash.
+      <Suspense fallback={<div style={{ minHeight: "100vh", backgroundColor: "#f8f5ef" }} />}>
+        <LandingPage />
+      </Suspense>
+    ),
+  },
   { path: "/login", element: <LoginPage /> },
   { path: "/signup", element: <SignupPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },

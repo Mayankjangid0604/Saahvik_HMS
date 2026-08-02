@@ -162,6 +162,15 @@ enum AdmissionFieldType {
   auto
 }
 
+// Uppercase by explicit spec, unlike the lowercase enums above. Those are
+// lowercase because they appear verbatim in the frontend API contract; this
+// one is internal to lead triage and is not part of that contract.
+enum ContactRequestStatus {
+  NEW
+  CONTACTED
+  CLOSED
+}
+
 // ---------- Beginner phase (BG-1) enums ----------
 
 // Category for a categorized resident document upload (feature 12).
@@ -823,6 +832,23 @@ model AuditLogEntry {
   @@index([orgId, action])
 }
 
+// ---------- public lead capture ----------
+
+// Written by the unauthenticated landing-page callback form, so there is
+// deliberately NO orgId — the org does not exist yet at this point. Read
+// back only by owners via GET /contact-requests.
+model ContactRequest {
+  id         String               @id @default(uuid())
+  name       String
+  hostelName String
+  phone      String
+  beds       Int
+  status     ContactRequestStatus @default(NEW)
+  createdAt  DateTime             @default(now())
+
+  @@index([status, createdAt])
+}
+
 // ---------- Beginner phase (BG-1) models ----------
 
 // Categorized resident document with optional expiry (features 4 & 12). The
@@ -1071,7 +1097,7 @@ model PortalInvite {
   createdByUserId String
   createdByName   String
   createdAt       DateTime         @default(now())
-
   @@index([orgId, residentId])
+  @@index([tokenHash])
   @@index([tokenHash])
 }

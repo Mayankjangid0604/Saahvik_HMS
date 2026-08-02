@@ -4,10 +4,10 @@
  * never leak into the app shell (which uses Tailwind + the @theme tokens).
  *
  * Display face is Cormorant Garamond per the frozen brand guide ("elegant
- * serif, embossed metallic gold"); it is landing-only, so the import lives
- * here rather than index.html. Body stays on the app's self-hosted Inter.
+ * serif, embossed metallic gold"). Body stays on the app's self-hosted Inter.
  */
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap");
+/* Cormorant Garamond moved to a <link> in index.html — a CSS @import here
+   blocked font discovery until this stylesheet had been parsed. */
 
 .landing {
   --sapphire: #1b2a4a;
@@ -338,27 +338,12 @@
   opacity: 0.13;
 }
 
-/* Cells that "fill in" on load. Default (and reduced motion): final state. */
-@media (prefers-reduced-motion: no-preference) {
-  .hero-cell-anim {
-    opacity: 0;
-    animation: hero-cell-fill 1.1s var(--ease-out-lux) forwards;
-  }
-  .hero-cell-anim-1 {
-    animation-delay: 0.7s;
-  }
-  .hero-cell-anim-2 {
-    animation-delay: 1.15s;
-  }
-  .hero-cell-anim-3 {
-    animation-delay: 1.6s;
-  }
-}
-
-@keyframes hero-cell-fill {
-  to {
-    opacity: 0.13;
-  }
+/* Cells that "fill in" on load are animated by Motion (see HeroGridMotif).
+   An SVG rect scales about the viewBox origin by default, so the fill-box
+   transform origin is what makes each cell spring open about its own centre. */
+.hero-cell-anim {
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .hero-content {
@@ -1003,12 +988,21 @@
   color: var(--muted);
 }
 
+/* Two columns (add-on + unit), so it needs far less width than the plan
+   comparison and fits most phones without horizontal scroll. */
 .addon-table {
-  min-width: 560px;
+  min-width: 0;
 }
 
 .addon-table thead th {
   text-align: left;
+}
+
+/* Keep "Unit" narrow and right-aligned against the name column. */
+.addon-table thead th:last-child,
+.addon-table tbody td:last-child {
+  width: 34%;
+  white-space: nowrap;
 }
 
 .addon-table tbody td {
@@ -1121,6 +1115,24 @@
   width: 100%;
 }
 
+.btn-form-submit:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Submit failure. Sits on the dark contact panel, so it needs a light red
+   rather than the usual ink-on-white error treatment. */
+.contact-form-error {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 8px;
+  background-color: rgba(248, 113, 113, 0.12);
+  font-size: 14px;
+  line-height: 1.5;
+  color: #fca5a5;
+}
+
 .contact-thanks-title {
   margin: 0 0 12px;
   font-family: var(--font-serif);
@@ -1196,28 +1208,10 @@
 
 /* ---------- Scroll reveal ---------- */
 
-/* Animation (not transition) so hover transforms still transition normally
-   after the entry has finished. */
-@media (prefers-reduced-motion: no-preference) {
-  .landing [data-reveal]:not(.is-revealed) {
-    opacity: 0;
-  }
-
-  .landing [data-reveal].is-revealed {
-    animation: landing-reveal 0.4s var(--ease-out-lux) backwards;
-  }
-}
-
-@keyframes landing-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* Section reveals are driven by Motion's useInView in LandingPage.tsx (see the
+   Reveal component) rather than a [data-reveal] class swap, so there is no
+   entry animation to declare here. Motion also handles reduced motion itself:
+   it renders the final state with no transform rather than a faster movement. */
 
 @media (prefers-reduced-motion: reduce) {
   .landing *,
