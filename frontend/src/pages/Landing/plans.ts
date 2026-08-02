@@ -105,7 +105,7 @@ export const PLANS: readonly Plan[] = [
   {
     id: "professional",
     name: "Professional",
-    tagline: "For operations spanning up to four buildings, with automation and AI.",
+    tagline: "For operations spanning two properties, with automation and AI.",
     pricing: {
       monthly: { amount: "5,499", per: "/month" },
       halfYearly: { amount: "29,599", per: "/6 months", effective: "≈ ₹4,933/mo" },

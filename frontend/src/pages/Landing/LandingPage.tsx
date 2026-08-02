@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent, MouseEvent as ReactMouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { motion, useInView, useReducedMotion } from "motion/react";
 import type { HTMLMotionProps } from "motion/react";
 import { Link } from "react-router-dom";
-import { submitContactRequest } from "@/api/contact.api";
-import { ApiRequestError } from "@/api/client";
 import { CheckIcon, GlobeIcon, MailIcon, WhatsAppIcon } from "./icons";
 import {
   ADDON_GROUPS,
@@ -150,6 +148,15 @@ function Reveal({ as = "div", children, ...rest }: RevealProps) {
     </Component>
   );
 }
+
+/* The contact section's primary action. WhatsApp is how these owners actually
+   get in touch, so the CTA opens a chat with the first message already written
+   rather than asking them to fill in a form and wait for a callback. */
+const WHATSAPP_NUMBER = "919530301131";
+const WHATSAPP_PREFILL = "Hi, I'd like to know more about Saahvik for my hostel.";
+const WHATSAPP_CTA_HREF = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+  WHATSAPP_PREFILL,
+)}`;
 
 /* Hero motif: a 6×4 grid of "rooms". Some beds are already occupied (static),
    a few more fill in on load — the animation is the product's core data. */
@@ -320,9 +327,6 @@ function Wordmark({ withBadge = true }: { withBadge?: boolean }) {
 export function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
   const [cycle, setCycle] = useState<CycleId>("monthly");
-  const [contactSubmitted, setContactSubmitted] = useState(false);
-  const [contactSubmitting, setContactSubmitting] = useState(false);
-  const [contactError, setContactError] = useState<string | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -340,37 +344,6 @@ export function LandingPage() {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     target.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
     history.replaceState(null, "", `#${id}`);
-  }
-
-  async function handleContactSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (contactSubmitting) return;
-    // Read the fields before the first await — React nulls out currentTarget
-    // once the handler yields.
-    const fields = new FormData(event.currentTarget);
-    const read = (key: string) => String(fields.get(key) ?? "").trim();
-
-    setContactSubmitting(true);
-    setContactError(null);
-    try {
-      await submitContactRequest({
-        name: read("name"),
-        hostelName: read("hostelName"),
-        phone: read("phone"),
-        beds: Number(read("beds")),
-      });
-      setContactSubmitted(true);
-    } catch (error) {
-      // Only confirm on a real 2xx — a dropped lead the owner thinks was sent
-      // is worse than an honest error.
-      setContactError(
-        error instanceof ApiRequestError && error.message
-          ? error.message
-          : "Something went wrong sending that. Please try again, or reach us on WhatsApp.",
-      );
-    } finally {
-      setContactSubmitting(false);
-    }
   }
 
   return (
@@ -729,75 +702,23 @@ export function LandingPage() {
               </Link>
             </Reveal>
             <Reveal className="contact-form-card">
-              {contactSubmitted ? (
-                <div className="contact-thanks" role="status">
-                  <h3 className="contact-thanks-title">Thank you!</h3>
-                  <p>
-                    We've noted your details. We'll reach out on the phone number
-                    you shared — usually within a day.
-                  </p>
-                </div>
-              ) : (
-                <form onSubmit={handleContactSubmit}>
-                  <p className="contact-form-title">Request a callback</p>
-                  <div className="contact-fields">
-                    <div className="contact-field">
-                      <label htmlFor="contact-name">Your name</label>
-                      <input
-                        id="contact-name"
-                        name="name"
-                        type="text"
-                        autoComplete="name"
-                        required
-                      />
-                    </div>
-                    <div className="contact-field">
-                      <label htmlFor="contact-hostel">Hostel name</label>
-                      <input
-                        id="contact-hostel"
-                        name="hostelName"
-                        type="text"
-                        autoComplete="organization"
-                        required
-                      />
-                    </div>
-                    <div className="contact-field">
-                      <label htmlFor="contact-phone">Phone</label>
-                      <input
-                        id="contact-phone"
-                        name="phone"
-                        type="tel"
-                        autoComplete="tel"
-                        inputMode="tel"
-                        required
-                      />
-                    </div>
-                    <div className="contact-field">
-                      <label htmlFor="contact-beds">Number of beds</label>
-                      <input
-                        id="contact-beds"
-                        name="beds"
-                        type="number"
-                        min={1}
-                        inputMode="numeric"
-                        required
-                      />
-                    </div>
-                  </div>
-                  {contactError && (
-                    <p className="contact-form-error" role="alert">
-                      {contactError}
-                    </p>
-                  )}
-                  <button
-                    type="submit"
-                    className="btn btn-gold btn-form-submit"
-                    disabled={contactSubmitting}
-                  >
-                    {contactSubmitting ? "Sending…" : "Request a callback"}
-                  </button>
-                </form>
-              )}
+              <span className="contact-cta-badge" aria-hidden="true">
+                <WhatsAppIcon />
+              </span>
+              <h3 className="contact-cta-title">Chat with us on WhatsApp</h3>
+              <p className="contact-cta-copy">
+                Tell us about your hostel and we'll get you set up — usually
+                within a day.
+              </p>
+              <a
+                href={WHATSAPP_CTA_HREF}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-gold contact-cta-button"
+              >
+                <WhatsAppIcon />
+                Message us on WhatsApp
+              </a>
             </Reveal>
           </div>
         </section>

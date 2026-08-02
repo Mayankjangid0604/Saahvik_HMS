@@ -882,7 +882,7 @@ export interface ContactRequestReceipt {
   createdAt: string;
 }
 
-export type ContactRequestStatus = "NEW" | "CONTACTED" | "CLOSED";
+export type ContactRequestStatus = "new" | "contacted" | "closed";
 
 /** Owner-only view of a captured lead (GET /contact-requests). */
 export interface ContactRequest extends ContactRequestInput {
