@@ -162,13 +162,10 @@ enum AdmissionFieldType {
   auto
 }
 
-// Uppercase by explicit spec, unlike the lowercase enums above. Those are
-// lowercase because they appear verbatim in the frontend API contract; this
-// one is internal to lead triage and is not part of that contract.
 enum ContactRequestStatus {
-  NEW
-  CONTACTED
-  CLOSED
+  new
+  contacted
+  closed
 }
 
 // ---------- Beginner phase (BG-1) enums ----------
@@ -843,7 +840,7 @@ model ContactRequest {
   hostelName String
   phone      String
   beds       Int
-  status     ContactRequestStatus @default(NEW)
+  status     ContactRequestStatus @default(new)
   createdAt  DateTime             @default(now())
 
   @@index([status, createdAt])

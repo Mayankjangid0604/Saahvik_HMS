@@ -71,7 +71,7 @@
 .landing-nav:not(.is-scrolled) :focus-visible {
   outline-color: var(--champagne);
 }
-/* …but inside the white form card we're back on a light surface. */
+/* …but inside the white contact card we're back on a light surface. */
 .contact-form-card :focus-visible {
   outline-color: var(--sapphire);
 }
@@ -1068,72 +1068,21 @@
   box-shadow: 0 16px 48px rgba(5, 10, 24, 0.4);
 }
 
-.contact-form-title {
-  margin: 0 0 20px;
-  font-family: var(--font-serif);
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--sapphire);
+/* The card is now a single WhatsApp call to action rather than a form, so it
+   centres on its one button instead of a grid of fields. */
+.contact-cta-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 20px;
+  border-radius: 50%;
+  background-color: rgba(176, 141, 87, 0.12);
+  color: var(--gold);
 }
 
-.contact-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 28px;
-}
-
-.contact-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.contact-field label {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--sapphire);
-}
-
-.contact-field input {
-  padding: 11px 14px;
-  font-family: inherit;
-  font-size: 16px;
-  color: var(--ink);
-  background-color: var(--white);
-  border: 1px solid rgba(27, 42, 74, 0.24);
-  border-radius: 4px;
-  transition: border-color 0.25s var(--ease-out-lux);
-}
-
-.contact-field input:hover {
-  border-color: rgba(27, 42, 74, 0.44);
-}
-
-.btn-form-submit {
-  width: 100%;
-}
-
-.btn-form-submit:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
-
-/* Submit failure. Sits on the dark contact panel, so it needs a light red
-   rather than the usual ink-on-white error treatment. */
-.contact-form-error {
-  margin: 0 0 14px;
-  padding: 10px 14px;
-  border: 1px solid rgba(248, 113, 113, 0.45);
-  border-radius: 8px;
-  background-color: rgba(248, 113, 113, 0.12);
-  font-size: 14px;
-  line-height: 1.5;
-  color: #fca5a5;
-}
-
-.contact-thanks-title {
+.contact-cta-title {
   margin: 0 0 12px;
   font-family: var(--font-serif);
   font-size: 28px;
@@ -1141,10 +1090,15 @@
   color: var(--sapphire);
 }
 
-.contact-thanks p {
-  margin: 0;
+.contact-cta-copy {
+  margin: 0 0 28px;
   font-size: 16px;
   color: var(--muted);
+}
+
+.contact-cta-button {
+  width: 100%;
+  gap: 10px;
 }
 
 /* ---------- Footer ---------- */
@@ -1315,10 +1269,6 @@
   .btn-nav {
     padding: 7px 14px;
     font-size: 13px;
-  }
-
-  .contact-fields {
-    grid-template-columns: 1fr;
   }
 
   .pricing-details summary {
