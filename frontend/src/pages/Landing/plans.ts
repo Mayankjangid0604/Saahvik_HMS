@@ -51,9 +51,9 @@ export const PLANS: readonly Plan[] = [
       yearly: { amount: "10,099", per: "/year", effective: "≈ ₹842/mo" },
     },
     limits: [
-      "1 property",
+      "1 property, 1 building/wing",
       "Owner + 3 staff logins",
-      "150 active residents · 500 lifetime records",
+      "100 active residents · 500 lifetime (active + alumni)",
       "10 GB storage",
       "1,000 emails/month",
     ],
@@ -65,7 +65,7 @@ export const PLANS: readonly Plan[] = [
       "Complaint logging with photos, assignment & status tracking",
       "4 standard reports (occupancy, dues, residents, collections) as PDF",
       "Admission form customization & bulk fee assignment",
-      "Guardian logins — one login covers multiple residents",
+      "Automatic email updates to parents and residents",
       "2FA, login audit trail & automated daily backups",
       "Email support & self-serve onboarding",
     ],
@@ -80,15 +80,15 @@ export const PLANS: readonly Plan[] = [
       yearly: { amount: "27,499", per: "/year", effective: "≈ ₹2,292/mo" },
     },
     limits: [
-      "1 property with floor-level organization",
-      "Owner + 10 staff logins · extended roles",
-      "200 active residents · 2,000 lifetime records",
-      "100 GB storage",
-      "5,000 emails + 500 WhatsApp + 500 SMS/month",
+      "1 property, 2 buildings/wings",
+      "Owner + 10 staff logins",
+      "250 active residents · 1,500 lifetime (active + alumni)",
+      "50 GB storage",
+      "2,000 emails + 500 WhatsApp + 500 SMS/month",
     ],
     inheritsLabel: "Everything in Basic, plus",
     features: [
-      "Resident self-service logins",
+      "Parent/guardian login — one login covers multiple residents",
       "WhatsApp & SMS notifications with announcement broadcasts",
       "Online fee collection from residents via Razorpay",
       "Visitor management with pre-approval & resident alerts",
@@ -112,15 +112,17 @@ export const PLANS: readonly Plan[] = [
       yearly: { amount: "55,999", per: "/year", effective: "≈ ₹4,667/mo" },
     },
     limits: [
-      "1 property · up to 4 buildings",
-      "Owner + 25 staff logins · custom roles",
-      "500 active residents · 5,000 lifetime records",
-      "250 GB storage",
-      "15,000 emails + 1,200 WhatsApp + 800 SMS/month",
-      "150,000 AI tokens/month",
+      "2 properties, 2 buildings/wings each",
+      "Owner + 25 staff logins",
+      "600 active residents · 3,000 lifetime (active + alumni)",
+      "150 GB storage",
+      "10,000 emails + 1,500 WhatsApp + 1,000 SMS/month",
+      "100,000 AI tokens/month",
     ],
     inheritsLabel: "Everything in Beginner, plus",
     features: [
+      "Parent/guardian login — one login covers multiple residents",
+      "Resident self-service login — residents see their own fees & receipts",
       "Multi-building hierarchy with per-building floors",
       "Custom role creation, delegation & multi-level approvals",
       "Double-entry accounting ledger, bank reconciliation & budgeting",
@@ -145,12 +147,12 @@ export const PLANS: readonly Plan[] = [
       yearly: { amount: "1,17,199", per: "/year", effective: "≈ ₹9,767/mo" },
     },
     limits: [
-      "3 properties · up to 4 buildings each",
-      "Owner + 60 staff logins",
-      "1,200 active residents · 12,000 lifetime records",
-      "600 GB storage",
-      "40,000 emails + 2,200 WhatsApp + 1,500 SMS/month",
-      "350,000 AI tokens/month",
+      "3 properties, 2 buildings/wings each",
+      "Owner + 100 staff logins",
+      "1,000 active residents + 1,000 parent logins (1:1 with residents)",
+      "350 GB storage",
+      "15,000 emails + 2,000 WhatsApp + 1,500 SMS/month",
+      "250,000 AI tokens/month",
     ],
     inheritsLabel: "Everything in Professional, plus",
     features: [
@@ -195,25 +197,30 @@ export const COMPARISON: readonly CompareSection[] = [
   {
     title: "Limits",
     rows: [
-      { label: "Properties", values: ["1", "1", "1", "3"] },
-      { label: "Buildings", values: ["—", "1", "Up to 4", "4 per property"] },
+      { label: "Properties", values: ["1", "1", "2", "3"] },
+      // Per property, so the figure reads the same way across all four plans.
+      { label: "Buildings / wings (per property)", values: ["1", "2", "2", "2"] },
       { label: "Floor-level organization", values: [N, Y, Y, Y] },
-      { label: "Staff logins", values: ["3", "10", "25", "60"] },
-      { label: "Active residents", values: ["150", "200", "500", "1,200"] },
-      { label: "Lifetime resident records", values: ["500", "2,000", "5,000", "12,000"] },
-      { label: "Storage", values: ["10 GB", "100 GB", "250 GB", "600 GB"] },
-      { label: "Email notifications / month", values: ["1,000", "5,000", "15,000", "40,000"] },
-      { label: "WhatsApp notifications / month", values: [N, "500", "1,200", "2,200"] },
-      { label: "SMS notifications / month", values: [N, "500", "800", "1,500"] },
-      { label: "AI tokens / month", values: [N, N, "150,000", "350,000"] },
+      { label: "Staff logins", values: ["3", "10", "25", "100"] },
+      { label: "Active residents", values: ["100", "250", "600", "1,000"] },
+      {
+        label: "Lifetime records (active + alumni)",
+        values: ["500", "1,500", "3,000", "5,000"],
+      },
+      { label: "Parent logins", values: [N, "Included", "Included", "1,000 (1:1)"] },
+      { label: "Storage", values: ["10 GB", "50 GB", "150 GB", "350 GB"] },
+      { label: "Email notifications / month", values: ["1,000", "2,000", "10,000", "15,000"] },
+      { label: "WhatsApp notifications / month", values: [N, "500", "1,500", "2,000"] },
+      { label: "SMS notifications / month", values: [N, "500", "1,000", "1,500"] },
+      { label: "AI tokens / month", values: [N, N, "100,000", "250,000"] },
     ],
   },
   {
     title: "Accounts & security",
     rows: [
       { label: "Owner + staff accounts with roles", values: [Y, Y, Y, Y] },
-      { label: "Guardian logins", values: [Y, Y, Y, Y] },
-      { label: "Resident self-service logins", values: [N, Y, Y, Y] },
+      { label: "Parent/guardian login", values: [N, Y, Y, Y] },
+      { label: "Resident self-service login", values: [N, N, Y, Y] },
       { label: "Extended roles (warden, accountant…)", values: [N, Y, Y, Y] },
       { label: "Custom roles & approval chains", values: [N, N, Y, Y] },
       { label: "Two-factor authentication & login audit trail", values: [Y, Y, Y, Y] },
@@ -317,10 +324,14 @@ export const COMPARISON: readonly CompareSection[] = [
 
 /* ---------- Add-on catalogs ---------- */
 
+/**
+ * An add-on is listed by name and billing unit only. Which tier needs which
+ * add-on is deliberately not shown here — it depends on the plan you land on,
+ * and pricing is quoted on contact anyway.
+ */
 export interface AddonRow {
   name: string;
   unit: string;
-  appliesTo: string;
 }
 
 export interface AddonGroup {
@@ -337,16 +348,16 @@ export const ADDON_GROUPS: readonly AddonGroup[] = [
     title: "Capacity add-ons",
     blurb: "Extra headroom on any plan limit — grow inside your tier instead of jumping a tier.",
     rows: [
-      { name: "Extra staff login", unit: "per login", appliesTo: "All plans" },
-      { name: "Extra active residents", unit: "block of 25", appliesTo: "All plans" },
-      { name: "Extra resident records (lifetime)", unit: "block of 250", appliesTo: "All plans" },
-      { name: "Extra storage", unit: "block of 10 GB", appliesTo: "All plans" },
-      { name: "Extra email volume", unit: "block of 1,000", appliesTo: "All plans" },
-      { name: "Extra WhatsApp volume", unit: "block of 100", appliesTo: "Beginner+" },
-      { name: "Extra SMS volume", unit: "block of 100", appliesTo: "Beginner+" },
-      { name: "Extra AI tokens", unit: "block of 50,000", appliesTo: "Professional+" },
-      { name: "Extra building", unit: "per building", appliesTo: "Professional+" },
-      { name: "Extra property", unit: "per property", appliesTo: "Business+" },
+      { name: "Extra staff login", unit: "per login" },
+      { name: "Extra active residents", unit: "block of 25" },
+      { name: "Extra resident records (lifetime)", unit: "block of 250" },
+      { name: "Extra storage", unit: "block of 10 GB" },
+      { name: "Extra email volume", unit: "block of 1,000" },
+      { name: "Extra WhatsApp volume", unit: "block of 100" },
+      { name: "Extra SMS volume", unit: "block of 100" },
+      { name: "Extra AI tokens", unit: "block of 50,000" },
+      { name: "Extra building", unit: "per building" },
+      { name: "Extra property", unit: "per property" },
     ],
   },
   {
@@ -354,18 +365,18 @@ export const ADDON_GROUPS: readonly AddonGroup[] = [
     title: "Feature add-ons",
     blurb: "Unlock a specific capability without upgrading the whole subscription. Add-ons drop off your bill automatically when you move to a tier that includes them.",
     rows: [
-      { name: "WhatsApp notification channel", unit: "flat + usage", appliesTo: "Basic only" },
-      { name: "SMS notification channel", unit: "flat + usage", appliesTo: "Basic only" },
-      { name: "Resident mobile app", unit: "flat", appliesTo: "Basic, Beginner" },
-      { name: "Full workflow builder (no-code)", unit: "flat", appliesTo: "Basic, Beginner" },
-      { name: "Custom report builder + advanced analytics", unit: "flat", appliesTo: "Basic, Beginner" },
-      { name: "AI assistant (chat + drafts + narrator)", unit: "flat", appliesTo: "Basic, Beginner" },
-      { name: "Custom domain", unit: "flat", appliesTo: "Basic – Professional" },
-      { name: "Full white-label (app + website)", unit: "flat", appliesTo: "Basic – Professional" },
-      { name: "Customer-owned notification provider", unit: "flat", appliesTo: "Basic – Professional" },
-      { name: "SSO (Google / Microsoft)", unit: "flat", appliesTo: "Basic, Beginner" },
-      { name: "SAML / SCIM enterprise SSO", unit: "flat", appliesTo: "Basic – Professional" },
-      { name: "Biometric / smart lock integration", unit: "flat", appliesTo: "Basic – Professional" },
+      { name: "WhatsApp notification channel", unit: "flat + usage" },
+      { name: "SMS notification channel", unit: "flat + usage" },
+      { name: "Resident mobile app", unit: "flat" },
+      { name: "Full workflow builder (no-code)", unit: "flat" },
+      { name: "Custom report builder + advanced analytics", unit: "flat" },
+      { name: "AI assistant (chat + drafts + narrator)", unit: "flat" },
+      { name: "Custom domain", unit: "flat" },
+      { name: "Full white-label (app + website)", unit: "flat" },
+      { name: "Customer-owned notification provider", unit: "flat" },
+      { name: "SSO (Google / Microsoft)", unit: "flat" },
+      { name: "SAML / SCIM enterprise SSO", unit: "flat" },
+      { name: "Biometric / smart lock integration", unit: "flat" },
     ],
   },
   {
@@ -373,12 +384,12 @@ export const ADDON_GROUPS: readonly AddonGroup[] = [
     title: "Support add-ons",
     blurb: "Raise your support level on any plan — up to a dedicated account manager and contractual SLAs.",
     rows: [
-      { name: "Chat support", unit: "flat", appliesTo: "Basic only" },
-      { name: "Call support (major issues)", unit: "flat", appliesTo: "Basic only" },
-      { name: "Priority support (all issues)", unit: "flat", appliesTo: "Basic, Beginner" },
-      { name: "Dedicated account manager", unit: "flat", appliesTo: "Basic – Professional" },
-      { name: "24×7 support", unit: "flat", appliesTo: "Basic – Professional" },
-      { name: "SLA guarantee", unit: "flat", appliesTo: "Basic – Professional" },
+      { name: "Chat support", unit: "flat" },
+      { name: "Call support (major issues)", unit: "flat" },
+      { name: "Priority support (all issues)", unit: "flat" },
+      { name: "Dedicated account manager", unit: "flat" },
+      { name: "24×7 support", unit: "flat" },
+      { name: "SLA guarantee", unit: "flat" },
     ],
     footnotes: [
       "Training sessions: live guided training for your staff, booked per session as needed.",
@@ -388,11 +399,11 @@ export const ADDON_GROUPS: readonly AddonGroup[] = [
   {
     id: "backup",
     title: "Backup & compliance add-ons",
-    blurb: "Enterprise-grade data protection on Basic through Professional — bundled natively from Business.",
+    blurb: "Enterprise-grade data protection, available on any plan that doesn't already bundle it.",
     rows: [
-      { name: "Point-in-time recovery", unit: "flat", appliesTo: "Basic – Professional" },
-      { name: "Self-service restore", unit: "flat", appliesTo: "Basic – Professional" },
-      { name: "Compliance reports (GDPR / DPDP export)", unit: "flat", appliesTo: "Basic – Professional" },
+      { name: "Point-in-time recovery", unit: "flat" },
+      { name: "Self-service restore", unit: "flat" },
+      { name: "Compliance reports (GDPR / DPDP export)", unit: "flat" },
     ],
     footnotes: [
       "Extended audit log retention: billed annually, extends retention beyond your tier's default window.",
@@ -420,15 +431,15 @@ export const FEATURE_EXPLANATIONS: Record<string, string> = {
     "Download ready-made reports on occupancy, pending payments, and collections as PDF files.",
   "Admission form customization & bulk fee assignment":
     "Design your own admission form fields and set fees for many students at once.",
-  "Guardian logins — one login covers multiple residents":
-    "Parents/guardians get their own login to check their child's fees and status.",
+  "Automatic email updates to parents and residents":
+    "Fee reminders, receipts, and status updates go out by email automatically — no login needed on their side.",
   "2FA, login audit trail & automated daily backups":
     "Extra login security with OTP, a log of who logged in when, and automatic daily data backups.",
   "Email support & self-serve onboarding":
     "Get help via email and use guided setup to configure your hostel yourself.",
   // Beginner
-  "Resident self-service logins":
-    "Students can log in themselves to see their fees, receipts, and room details.",
+  "Parent/guardian login — one login covers multiple residents":
+    "Parents/guardians get their own login to check their child's fees and status. One parent with two children in the hostel still uses a single login.",
   "WhatsApp & SMS notifications with announcement broadcasts":
     "Send fee reminders and announcements directly to students via WhatsApp and SMS.",
   "Online fee collection from residents via Razorpay":
@@ -452,6 +463,8 @@ export const FEATURE_EXPLANATIONS: Record<string, string> = {
   "Chat support + call support for major issues":
     "Get help via chat anytime, and phone support for urgent problems.",
   // Professional
+  "Resident self-service login — residents see their own fees & receipts":
+    "Students get their own login to check their fees, download receipts, and see room details themselves.",
   "Multi-building hierarchy with per-building floors":
     "Manage multiple buildings (boys hostel, girls hostel, etc.) each with their own floor structure.",
   "Custom role creation, delegation & multi-level approvals":

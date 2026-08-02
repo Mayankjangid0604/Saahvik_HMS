@@ -7,6 +7,7 @@ import { AuthModule } from "./auth/auth.module";
 import { JwtAuthGuard } from "./common/jwt-auth.guard";
 import { RolesGuard } from "./common/roles.guard";
 import { ComplaintsModule } from "./complaints/complaints.module";
+import { ContactRequestsModule } from "./contact-requests/contact-requests.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { ExpensesModule } from "./expenses/expenses.module";
 import { FilesModule } from "./files/files.module";
@@ -42,6 +43,7 @@ import { HealthController } from "./health.controller";
     ResidentsModule,
     StaffModule,
     ComplaintsModule,
+    ContactRequestsModule,
     NotificationsModule,
     FinanceModule,
     ExpensesModule,

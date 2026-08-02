@@ -824,3 +824,28 @@ export interface CollectionReportRow {
   totalPaisa: number;
   paymentCount: number;
 }
+
+/* ---------- Public contact / lead capture ---------- */
+
+/** Payload of the landing page's "Request a callback" form (pre-signup). */
+export interface ContactRequestInput {
+  name: string;
+  hostelName: string;
+  phone: string;
+  beds: number;
+}
+
+/** Nothing about the stored lead is echoed back to an anonymous caller. */
+export interface ContactRequestReceipt {
+  id: string;
+  createdAt: string;
+}
+
+export type ContactRequestStatus = "NEW" | "CONTACTED" | "CLOSED";
+
+/** Owner-only view of a captured lead (GET /contact-requests). */
+export interface ContactRequest extends ContactRequestInput {
+  id: string;
+  status: ContactRequestStatus;
+  createdAt: string;
+}

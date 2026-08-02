@@ -162,6 +162,15 @@ enum AdmissionFieldType {
   auto
 }
 
+// Uppercase by explicit spec, unlike the lowercase enums above. Those are
+// lowercase because they appear verbatim in the frontend API contract; this
+// one is internal to lead triage and is not part of that contract.
+enum ContactRequestStatus {
+  NEW
+  CONTACTED
+  CLOSED
+}
+
 // ---------- core tenancy ----------
 
 model Organization {
@@ -677,4 +686,21 @@ model AuditLogEntry {
 
   @@index([orgId, createdAt])
   @@index([orgId, action])
+}
+
+// ---------- public lead capture ----------
+
+// Written by the unauthenticated landing-page callback form, so there is
+// deliberately NO orgId — the org does not exist yet at this point. Read
+// back only by owners via GET /contact-requests.
+model ContactRequest {
+  id         String               @id @default(uuid())
+  name       String
+  hostelName String
+  phone      String
+  beds       Int
+  status     ContactRequestStatus @default(NEW)
+  createdAt  DateTime             @default(now())
+
+  @@index([status, createdAt])
 }
