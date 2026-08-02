@@ -9,6 +9,7 @@ import { AuthProvider } from "@/features/auth/AuthContext";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
+import { RouteErrorBoundary } from "@/components/layout/RouteErrorBoundary";
 
 // Route-level split, and deliberately so: the landing page is the only thing
 // that pulls in Motion and the Cormorant display face, and none of that should
@@ -75,17 +76,19 @@ const router = createBrowserRouter([
         <LandingPage />
       </Suspense>
     ),
+    errorElement: <RouteErrorBoundary />,
   },
-  { path: "/login", element: <LoginPage /> },
-  { path: "/signup", element: <SignupPage /> },
-  { path: "/forgot-password", element: <ForgotPasswordPage /> },
-  { path: "/2fa", element: <TwoFactorPage /> },
+  { path: "/login", element: <LoginPage />, errorElement: <RouteErrorBoundary /> },
+  { path: "/signup", element: <SignupPage />, errorElement: <RouteErrorBoundary /> },
+  { path: "/forgot-password", element: <ForgotPasswordPage />, errorElement: <RouteErrorBoundary /> },
+  { path: "/2fa", element: <TwoFactorPage />, errorElement: <RouteErrorBoundary /> },
   {
     element: (
       <ProtectedRoute>
         <AppShell />
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorBoundary />,
     children: [
       { path: "dashboard", element: <DashboardPage /> },
       { path: "setup", element: <HostelSetupPage /> },
