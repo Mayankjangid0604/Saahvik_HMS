@@ -17,6 +17,7 @@ import type { AuthUser, JwtPayload } from "../common/auth-user";
 import { staffToUserDto, toOrgDto, toUserDto } from "../common/mappers";
 import { PrismaService } from "../prisma/prisma.service";
 import { DEFAULT_ADMISSION_FIELDS } from "../settings/admission-defaults";
+import { EmailOtpService } from "./email-otp.service";
 import { EmailService } from "./email.service";
 import type {
   ChangePasswordDto,
@@ -40,6 +41,7 @@ export class AuthService {
     @Inject(JwtService) private readonly jwt: JwtService,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(EmailService) private readonly email: EmailService,
+    @Inject(EmailOtpService) private readonly emailOtp: EmailOtpService,
   ) {}
 
   // ---------- signup ----------
@@ -49,6 +51,10 @@ export class AuthService {
     if (existing) throw new ConflictException("An account with this email already exists");
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
+    // The wizard verifies the address before this call; trust the server-side
+    // record, never a client-supplied "verified" flag. Signup is NOT blocked
+    // on it — an unverified address simply creates an unverified Owner.
+    const emailVerified = await this.emailOtp.isVerified(dto.email);
 
     const { org, owner } = await this.prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({
@@ -67,8 +73,17 @@ export class AuthService {
           email: dto.email,
           phone: dto.phone,
           passwordHash,
+          emailVerified,
+          // phoneVerified stays false — no SMS provider is connected yet.
         },
       });
+      // One-shot: the proof belongs to this account now, so a later signup
+      // with the same address can't ride on it.
+      if (emailVerified) {
+        await tx.emailVerification.deleteMany({
+          where: { email: dto.email.trim().toLowerCase() },
+        });
+      }
       await tx.hostel.create({ data: { orgId: org.id, name: dto.hostelName } });
 
       // Seed the 28 default admission-form fields (Sunrise Hostel pattern).

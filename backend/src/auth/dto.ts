@@ -69,6 +69,20 @@ export class ResetPasswordDto {
   newPassword!: string;
 }
 
+export class SendEmailOtpDto {
+  @IsEmail()
+  email!: string;
+}
+
+export class VerifyEmailOtpDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "Enter the 6-digit code we emailed you" })
+  code!: string;
+}
+
 export class ChangePasswordDto {
   @IsString()
   @IsNotEmpty()

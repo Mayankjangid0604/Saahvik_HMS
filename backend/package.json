@@ -17,6 +17,7 @@
     "test:dues-accrual": "tsx test/dues-accrual.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.1101.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/jwt": "^11.0.0",

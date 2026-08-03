@@ -1,28 +1,20 @@
 import { useId, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
-import type { OtpChannel } from "@/api/types";
+import { CheckCircle2, Clock } from "lucide-react";
+import { sendEmailOtp, verifyEmailOtp } from "@/api/emailOtp.api";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/cn";
-import { mockSendOtp, mockVerifyOtp } from "./mocks";
 
 type CardPhase = "idle" | "sending" | "sent" | "verifying";
 
-/** One verification card (phone or email): Send → 6-digit code → Verify. */
-function OtpCard({
-  channel,
-  title,
-  destination,
+/** Email verification: Send → 6-digit code → Verify, all server-side. */
+function EmailOtpCard({
+  email,
   verified,
-  verifiedNote,
   onVerified,
 }: {
-  channel: OtpChannel;
-  title: string;
-  destination: string;
+  email: string;
   verified: boolean;
-  /** Shown instead of the flow when already verified (e.g. "via Google"). */
-  verifiedNote?: string;
   onVerified: () => void;
 }) {
   const inputId = useId();
@@ -33,19 +25,29 @@ function OtpCard({
   async function send() {
     setPhase("sending");
     setError(null);
-    await mockSendOtp(channel, destination);
-    setPhase("sent");
+    try {
+      await sendEmailOtp(email);
+      setPhase("sent");
+      setCode("");
+    } catch (err) {
+      // Covers the 60s per-address cooldown and the per-IP limiter — the
+      // backend's message already says how long to wait.
+      setError((err as Error).message);
+      // A cooldown rejection means a code is already out there; keep the
+      // entry field up rather than dropping back to a dead "Send" button.
+      setPhase((p) => (p === "sending" ? "idle" : p));
+    }
   }
 
   async function verify() {
     setPhase("verifying");
     setError(null);
-    const result = await mockVerifyOtp(channel, code);
-    if (result.verified) {
+    try {
+      await verifyEmailOtp(email, code);
       onVerified();
-    } else {
+    } catch (err) {
       setPhase("sent");
-      setError(result.error ?? "Verification failed");
+      setError((err as Error).message);
       setCode("");
     }
   }
@@ -59,8 +61,8 @@ function OtpCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-ink">{title}</p>
-          <p className="mt-0.5 text-xs text-muted">{destination}</p>
+          <p className="text-sm font-semibold text-ink">Verify your email</p>
+          <p className="mt-0.5 text-xs text-muted">{email}</p>
         </div>
         {verified && (
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
@@ -69,20 +71,25 @@ function OtpCard({
         )}
       </div>
 
-      {verified ? (
-        verifiedNote && <p className="mt-2 text-xs text-emerald-700">{verifiedNote}</p>
-      ) : (
+      {!verified && (
         <div className="mt-3 space-y-2">
           {phase === "idle" || phase === "sending" ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              isLoading={phase === "sending"}
-              onClick={send}
-            >
-              {channel === "phone" ? "Send OTP" : "Send code"}
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                isLoading={phase === "sending"}
+                onClick={send}
+              >
+                Send code
+              </Button>
+              {error && (
+                <p role="alert" className="text-xs text-red-600">
+                  {error}
+                </p>
+              )}
+            </>
           ) : (
             <>
               <label htmlFor={inputId} className="block text-xs font-medium text-slate-600">
@@ -130,48 +137,52 @@ function OtpCard({
   );
 }
 
+/**
+ * Phone verification is deliberately not built: TRAI DLT registration isn't
+ * done and no SMS provider is connected, so there is nothing to call. The
+ * number is shown as entered and the account stays phoneVerified: false —
+ * no send/verify controls, and no badge claiming otherwise.
+ */
+function PhoneDeferredCard({ phone }: { phone: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-ink">Phone verification</p>
+          <p className="mt-0.5 text-xs text-muted">+91 {phone}</p>
+        </div>
+        <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+          <Clock className="h-3.5 w-3.5" /> Later
+        </span>
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        Phone verification isn't available yet — you can verify this later from
+        your account settings.
+      </p>
+    </div>
+  );
+}
+
 export function StepVerify({
   phone,
   email,
-  phoneVerified,
   emailVerified,
-  emailVerifiedViaGoogle,
-  onPhoneVerified,
   onEmailVerified,
   onBack,
   onContinue,
 }: {
   phone: string;
   email: string;
-  phoneVerified: boolean;
   emailVerified: boolean;
-  emailVerifiedViaGoogle: boolean;
-  onPhoneVerified: () => void;
   onEmailVerified: () => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
-  const bothVerified = phoneVerified && emailVerified;
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <OtpCard
-          channel="phone"
-          title="Verify your phone"
-          destination={`+91 ${phone}`}
-          verified={phoneVerified}
-          onVerified={onPhoneVerified}
-        />
-        <OtpCard
-          channel="email"
-          title="Verify your email"
-          destination={email}
-          verified={emailVerified}
-          verifiedNote={
-            emailVerifiedViaGoogle ? "Verified via Google — nothing to do here." : undefined
-          }
-          onVerified={onEmailVerified}
-        />
+        <EmailOtpCard email={email} verified={emailVerified} onVerified={onEmailVerified} />
+        <PhoneDeferredCard phone={phone} />
       </div>
       <p className="text-xs text-muted">
         You only verify once — future sign-ins won't repeat this.
@@ -180,7 +191,8 @@ export function StepVerify({
         <Button type="button" variant="ghost" onClick={onBack}>
           Back
         </Button>
-        <Button type="button" disabled={!bothVerified} onClick={onContinue}>
+        {/* Email alone gates the wizard — phone is deferred, not required. */}
+        <Button type="button" disabled={!emailVerified} onClick={onContinue}>
           Continue
         </Button>
       </div>

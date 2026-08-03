@@ -1,22 +1,51 @@
-import { Body, Controller, Get, Inject, Post, Put } from "@nestjs/common";
+import { Controller, Get, Inject, Post, Put, UseGuards } from "@nestjs/common";
 import type { AuthUser } from "../common/auth-user";
 import { CurrentUser, Public, Roles } from "../common/decorators";
-import { ValidatedBody, ValidatedQuery } from "../common/validated";
+import { IpRateLimit } from "../common/ip-rate-limit.guard";
+import { ValidatedBody } from "../common/validated";
 import { AuthService } from "./auth.service";
+import { EmailOtpService } from "./email-otp.service";
 import {
   ChangePasswordDto,
   ForgotPasswordDto,
   LoginDto,
   ResetPasswordDto,
+  SendEmailOtpDto,
   SignupDto,
   TwoFactorTokenDto,
   TwoFactorVerifyDto,
   UpdateProfileDto,
+  VerifyEmailOtpDto,
 } from "./dto";
+
+/**
+ * Per-IP ceiling on top of the per-address cooldown in EmailOtpService: the
+ * cooldown alone would let one client cycle through many addresses, each
+ * costing a real SES send.
+ */
+const SendOtpRateLimitGuard = IpRateLimit({
+  max: 8,
+  windowMs: 10 * 60 * 1000,
+  message: "Too many verification emails requested. Please try again in a few minutes.",
+});
+
+/**
+ * Verifies are looser than sends — they cost nothing to serve, and guessing is
+ * already capped by the 5-attempt-per-code lockout. This only stops a client
+ * from spraying attempts across many addresses.
+ */
+const VerifyOtpRateLimitGuard = IpRateLimit({
+  max: 20,
+  windowMs: 10 * 60 * 1000,
+  message: "Too many verification attempts. Please try again in a few minutes.",
+});
 
 @Controller("auth")
 export class AuthController {
-  constructor(@Inject(AuthService) private readonly auth: AuthService) {}
+  constructor(
+    @Inject(AuthService) private readonly auth: AuthService,
+    @Inject(EmailOtpService) private readonly emailOtp: EmailOtpService,
+  ) {}
 
   @Public()
   @Post("signup")
@@ -53,6 +82,24 @@ export class AuthController {
   @Roles("owner")
   disableTwoFactor(@CurrentUser() user: AuthUser, @ValidatedBody(TwoFactorTokenDto) dto: TwoFactorTokenDto) {
     return this.auth.disableTwoFactor(user, dto.token);
+  }
+
+  /**
+   * Email verification for signup — public because the Owner does not exist
+   * yet at this point in the wizard (account → verify → plan → signup).
+   */
+  @Public()
+  @UseGuards(SendOtpRateLimitGuard)
+  @Post("email-otp/send")
+  sendEmailOtp(@ValidatedBody(SendEmailOtpDto) dto: SendEmailOtpDto) {
+    return this.emailOtp.send(dto.email);
+  }
+
+  @Public()
+  @UseGuards(VerifyOtpRateLimitGuard)
+  @Post("email-otp/verify")
+  verifyEmailOtp(@ValidatedBody(VerifyEmailOtpDto) dto: VerifyEmailOtpDto) {
+    return this.emailOtp.verify(dto.email, dto.code);
   }
 
   @Public()
