@@ -1,75 +1,72 @@
-# Vercel Web Analytics Configuration Report
+# Vercel Speed Insights Installation
 
 ## Summary
-Vercel Web Analytics is **already installed and properly configured** in this project. The implementation follows the latest official Vercel documentation for React/Vite applications.
+Successfully installed and configured Vercel Speed Insights for the Saahvik HMS frontend application (React + Vite).
 
-## Current Configuration
+## Changes Made
 
-### Package Installation
-- **Package**: `@vercel/analytics`
-- **Version**: 2.0.1 (latest stable version)
-- **Status**: ✅ Installed in package.json dependencies
+### 1. Package Installation
+- **Added**: `@vercel/speed-insights` (v2.0.0) to dependencies
+- **Updated**: `package.json` and `package-lock.json` with the new package
 
-### Implementation Details
+### 2. Code Integration
+- **Modified**: `frontend/src/main.tsx`
+  - Added import: `import { SpeedInsights } from "@vercel/speed-insights/react"`
+  - Added `<SpeedInsights />` component to the render tree, placed alongside the existing `<Analytics />` component
 
-**File**: `frontend/src/main.tsx`
+## Implementation Details
 
-**Import Statement**:
-```typescript
-import { Analytics } from "@vercel/analytics/react";
+### Installation Method
+Followed the latest official Vercel Speed Insights documentation from https://vercel.com/docs/speed-insights/quickstart:
+- Installed the package using npm
+- Imported the React-specific SpeedInsights component
+- Added the component at the root level of the application
+
+### Placement Strategy
+The `<SpeedInsights />` component was added in the main.tsx file within the component tree:
+```tsx
+<QueryClientProvider client={queryClient}>
+  <AuthProvider>
+    <ToastProvider>
+      <RouterProvider router={router} />
+      <Analytics />
+      <SpeedInsights />  // <-- Added here
+    </ToastProvider>
+  </AuthProvider>
+</QueryClientProvider>
 ```
 
-**Component Usage**:
-The `<Analytics />` component is rendered within the root component tree:
-```typescript
-<StrictMode>
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <ToastProvider>
-        <RouterProvider router={router} />
-        <Analytics />
-      </ToastProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-</StrictMode>
-```
-
-### Framework-Specific Configuration
-- **Framework**: React with Vite
-- **Implementation**: Matches official Vercel documentation for React/Vite
-- **Component Placement**: At root level within the main React tree (optimal for tracking all routes)
+This placement ensures:
+- Speed Insights tracks all routes and page transitions
+- It's initialized early in the component tree
+- It follows the same pattern as the existing Analytics component
+- The component is rendered once at the application root level
 
 ## Verification
 
-### Build Status
-✅ Successfully built with no errors:
-```
-vite v8.1.5 building client environment for production...
-✓ 2302 modules transformed.
-✓ built in 1.17s
-```
+### Build Verification
+- ✅ TypeScript compilation successful (tsc -b)
+- ✅ Vite build completed successfully
+- ✅ No errors or warnings introduced
+- ✅ Build output sizes are normal
 
-### Documentation Compliance
-The implementation was verified against the official Vercel Analytics Quickstart documentation (https://vercel.com/docs/analytics/quickstart):
-- ✅ Correct package name and version
-- ✅ Framework-specific import path (`@vercel/analytics/react`)
-- ✅ Proper component usage
-- ✅ Optimal component placement for SPA routing
+### Files Changed
+1. `frontend/package.json` - Added @vercel/speed-insights dependency
+2. `frontend/package-lock.json` - Updated lockfile with new package and dependencies
+3. `frontend/src/main.tsx` - Added SpeedInsights import and component
 
-## Deployment Notes
+## Next Steps
 
-### To Enable Analytics on Vercel:
-1. Navigate to your project in the Vercel dashboard
-2. Go to the Analytics tab
-3. Click "Enable" button in the header
-4. Deploy the application using `vercel deploy`
+To complete the Speed Insights setup:
+1. Deploy the application to Vercel
+2. Enable Speed Insights in the Vercel dashboard:
+   - Navigate to your project settings
+   - Go to Speed Insights in the sidebar
+   - Click the "Enable" button
+3. After deployment and user visits, performance metrics will appear in the Vercel dashboard
 
-### Analytics Features Available:
-- Page view tracking (automatic)
-- Unique visitor tracking
-- Top pages analytics
-- Referrer tracking
-- Device and browser analytics
-
-## No Changes Required
-The project already has Vercel Web Analytics correctly installed and configured according to the latest official documentation. The implementation is production-ready and will begin tracking once enabled in the Vercel dashboard and deployed.
+## Notes
+- The Speed Insights component automatically tracks Core Web Vitals and other performance metrics
+- No additional configuration is required for basic usage
+- The component is framework-aware and optimized for React applications
+- Metrics will only be collected when deployed on Vercel's platform
