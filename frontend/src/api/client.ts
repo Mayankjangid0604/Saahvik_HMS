@@ -39,7 +39,7 @@ export const apiClient = axios.create({
 // Attach the logged-in user's JWT. Tenancy (orgId) is derived server-side
 // from the verified token — the backend ignores any org header.
 apiClient.interceptors.request.use((config) => {
-  const token = sessionStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -47,9 +47,9 @@ apiClient.interceptors.request.use((config) => {
 });
 
 function clearSession() {
-  sessionStorage.removeItem(TOKEN_KEY);
-  sessionStorage.removeItem(USER_KEY);
-  sessionStorage.removeItem(ORG_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(ORG_KEY);
 }
 
 /** Credential endpoints where a 401 means "bad input", not "stale session". */

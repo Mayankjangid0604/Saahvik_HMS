@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { WizardStepId } from "./wizardStorage";
@@ -28,15 +29,13 @@ export function WizardShell({
   const currentIndex = steps.findIndex((s) => s.id === current);
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-4 py-8">
-      <div className="mb-6 flex items-center gap-2.5">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary font-serif text-xl font-bold text-accent">
-          S
-        </span>
+      <Link to="/" className="mb-6 flex items-center gap-2.5 no-underline">
+        <img src="/brand/saahvik-mark.png" alt="" className="h-10 w-10 rounded-lg" />
         <div>
           <p className="text-lg font-semibold text-primary">Saahvik</p>
           <p className="text-xs text-muted">Hostel Management</p>
         </div>
-      </div>
+      </Link>
 
       <ol
         aria-label="Signup progress"

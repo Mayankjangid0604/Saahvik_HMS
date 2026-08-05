@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { FormField } from "@/components/ui/FormField";
-import { useToast } from "@/components/ui/Toast";
 import { emailSchema } from "@/lib/validators";
 
 const schema = z.object({
@@ -24,7 +23,6 @@ export function LoginPage() {
   const { login, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
   const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
 
   // Showing the login form means starting a fresh session: drop any stored
@@ -50,7 +48,6 @@ export function LoginPage() {
       login({ token: res.token!, user: res.user!, org: res.org! });
       navigate(from, { replace: true });
     },
-    onError: (err: Error) => toast({ title: "Login failed", description: err.message, variant: "error" }),
   });
 
   return (
