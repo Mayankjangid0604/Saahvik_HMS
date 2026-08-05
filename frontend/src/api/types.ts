@@ -96,34 +96,22 @@ export interface AuthSession {
   org: Org;
 }
 
-// ---------- Signup wizard & social auth ----------
-// These shapes are consumed by mock flows today (no OAuth/OTP/payment
-// provider is wired yet) but are written as the future API contract.
+// ---------- Signup wizard ----------
 
-/** What a completed Google sign-in hands back to the app. */
-export interface GoogleAuthResult {
-  provider: "google";
-  /** Google account `sub` claim (mocked until real OAuth exists). */
-  googleId: string;
-  name: string;
-  email: string;
-  /** Google verifies email ownership; phone still needs our own OTP. */
-  emailVerified: boolean;
-}
-
-export type OtpChannel = "phone" | "email";
-
-export interface OtpSendResult {
-  channel: OtpChannel;
+/**
+ * Email OTP, issued and checked by the backend before the Owner row exists
+ * (POST /auth/email-otp/send | /verify). Phone verification is deliberately
+ * absent — no SMS provider is connected and TRAI DLT registration is not
+ * done, so `Owner.phoneVerified` stays false and nothing claims otherwise.
+ */
+export interface EmailOtpSendResult {
   sent: boolean;
-  /** Where the code went, for display (e.g. masked phone). */
-  destination: string;
+  /** Seconds until another send is allowed. */
+  cooldownSeconds: number;
 }
 
-export interface OtpVerifyResult {
-  channel: OtpChannel;
+export interface EmailOtpVerifyResult {
   verified: boolean;
-  error?: string;
 }
 
 export type BillingCycle = "monthly" | "yearly";

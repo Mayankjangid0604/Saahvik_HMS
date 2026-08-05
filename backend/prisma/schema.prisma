@@ -333,12 +333,42 @@ model Owner {
   twoFactorBackupCodes   String[] // bcrypt hashes; a code is removed once used
   passwordResetToken     String?
   passwordResetExpiresAt DateTime?
+  // Set at signup from the EmailVerification row for this address (see below).
+  emailVerified          Boolean   @default(false)
+  // No SMS provider is connected and TRAI DLT registration is not done, so
+  // nothing sets this true yet. That is the honest state, not a missing piece.
+  phoneVerified          Boolean   @default(false)
   tokenVersion           Int       @default(0) // bumped on password change; old JWTs die
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
   org        Organization    @relation(fields: [orgId], references: [id])
   challenges AuthChallenge[]
+}
+
+/**
+ * Email-ownership proof, keyed by address rather than by Owner — the signup
+ * wizard verifies the email BEFORE the account is created (account → verify →
+ * plan → payment → POST /auth/signup), so at OTP time there is no Owner row to
+ * hang these columns off. One row per address, reused across attempts.
+ */
+model EmailVerification {
+  id String @id @default(uuid())
+
+  email String @unique
+
+  /** SHA-256 of the 6-digit code — the raw code is never stored. */
+  codeHash  String?
+  expiresAt DateTime?
+  /** Wrong guesses against the CURRENT code; reset on each new send. */
+  attempts  Int       @default(0)
+  /** Drives the per-address send cooldown. */
+  lastSentAt DateTime?
+  /** Set once the code is accepted; consumed and cleared by signup. */
+  verifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Short-lived 2FA login challenge (the tempSessionId handed out by
@@ -1095,6 +1125,5 @@ model PortalInvite {
   createdByName   String
   createdAt       DateTime         @default(now())
   @@index([orgId, residentId])
-  @@index([tokenHash])
   @@index([tokenHash])
 }

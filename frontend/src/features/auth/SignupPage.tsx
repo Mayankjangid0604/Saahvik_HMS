@@ -11,7 +11,6 @@ import { StepAccount, type AccountValues } from "./signup/StepAccount";
 import { StepVerify } from "./signup/StepVerify";
 import { StepPlan } from "./signup/StepPlan";
 import { StepPayment } from "./signup/StepPayment";
-import { mockGoogleSignIn } from "./signup/mocks";
 import {
   clearWizardDraft,
   loadWizardDraft,
@@ -20,23 +19,11 @@ import {
   type WizardStepId,
 } from "./signup/wizardStorage";
 
-/**
- * Google-linked accounts never chose a password, but the current
- * POST /auth/signup contract requires one — generate a throwaway.
- * TODO: drop this once the backend supports password-less Google-linked
- * signups (real OAuth token exchange instead).
- */
-function generateThrowawayPassword(): string {
-  const bytes = new Uint8Array(18);
-  crypto.getRandomValues(bytes);
-  return `G!${btoa(String.fromCharCode(...bytes))}`;
-}
-
 const STEP_TITLES: Record<WizardStepId, { title: string; subtitle: string }> = {
   account: { title: "Create your account", subtitle: "Start managing your hostel in minutes." },
   verify: {
-    title: "Verify your contact details",
-    subtitle: "One-time verification of your phone and email — never repeated on login.",
+    title: "Verify your email",
+    subtitle: "One-time verification — never repeated on login.",
   },
   plan: { title: "Choose how to start", subtitle: "Start free today, or pay upfront." },
   payment: { title: "Payment", subtitle: "Complete your Basic subscription." },
@@ -56,13 +43,12 @@ export function SignupPage() {
   const [draft, setDraft] = useState<WizardDraft>(loadWizardDraft);
   // Held in memory only — never written to storage (see wizardStorage.ts).
   const [password, setPassword] = useState("");
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [completion, setCompletion] = useState<CompletionState>({ status: "pending" });
   const completingRef = useRef(false);
 
   // A refresh drops the in-memory password and any in-flight completion:
   // "done" falls back to the plan step (choice is preserved, one click away),
-  // and the manual path past step 1 returns there to re-enter the password.
+  // and anything past step 1 returns there to re-enter the password.
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current) return;
@@ -73,7 +59,7 @@ export function SignupPage() {
       }
       return d;
     });
-    if (draft.step !== "account" && !draft.google && !password) {
+    if (draft.step !== "account" && !password) {
       setDraft((d) => ({ ...d, step: "account" }));
       toast({
         title: "Please re-enter your password",
@@ -96,34 +82,17 @@ export function SignupPage() {
     { id: "done", label: "Finish" },
   ];
 
-  async function handleGoogle() {
-    setGoogleLoading(true);
-    try {
-      const result = await mockGoogleSignIn();
-      // Google verified the email; phone verification is still ours to do.
-      setDraft((d) => ({
-        ...d,
-        google: result,
-        name: result.name,
-        email: result.email,
-        emailVerified: true,
-      }));
-    } finally {
-      setGoogleLoading(false);
-    }
-  }
-
   function handleAccountSubmit(values: AccountValues) {
-    setPassword(values.password ?? "");
+    setPassword(values.password);
     setDraft((d) => ({
       ...d,
       name: values.name,
       hostelName: values.hostelName,
       email: values.email,
       phone: values.phone,
-      // Changing the email on the manual path invalidates a prior verification.
-      emailVerified: d.google ? true : d.email === values.email && d.emailVerified,
-      phoneVerified: d.phone === values.phone && d.phoneVerified,
+      // Changing the email invalidates a prior verification — the OTP was
+      // issued against the old address.
+      emailVerified: d.email === values.email && d.emailVerified,
       step: "verify",
     }));
   }
@@ -137,8 +106,7 @@ export function SignupPage() {
     if (completingRef.current) return;
     completingRef.current = true;
     setCompletion({ status: "pending" });
-    const effectivePassword = draftNow.google ? generateThrowawayPassword() : password;
-    if (!effectivePassword) {
+    if (!password) {
       completingRef.current = false;
       setDraft((d) => ({ ...d, step: "account" }));
       toast({
@@ -154,7 +122,7 @@ export function SignupPage() {
         email: draftNow.email,
         phone: draftNow.phone,
         hostelName: draftNow.hostelName,
-        password: effectivePassword,
+        password,
       });
       login(session);
       clearWizardDraft();
@@ -204,20 +172,14 @@ export function SignupPage() {
             phone: draft.phone,
             password: "",
           }}
-          google={draft.google}
           onSubmit={handleAccountSubmit}
-          onGoogle={handleGoogle}
-          googleLoading={googleLoading}
         />
       )}
       {draft.step === "verify" && (
         <StepVerify
           phone={draft.phone}
           email={draft.email}
-          phoneVerified={draft.phoneVerified}
           emailVerified={draft.emailVerified}
-          emailVerifiedViaGoogle={!!draft.google}
-          onPhoneVerified={() => setDraft((d) => ({ ...d, phoneVerified: true }))}
           onEmailVerified={() => setDraft((d) => ({ ...d, emailVerified: true }))}
           onBack={() => goTo("account")}
           onContinue={() => goTo("plan")}

@@ -3,12 +3,14 @@ import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import "./index.css";
 
 import { AuthProvider } from "@/features/auth/AuthContext";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
+import { RouteErrorBoundary } from "@/components/layout/RouteErrorBoundary";
 
 // Route-level split, and deliberately so: the landing page is the only thing
 // that pulls in Motion and the Cormorant display face, and none of that should
@@ -84,6 +86,7 @@ const router = createBrowserRouter([
         <LandingPage />
       </Suspense>
     ),
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/privacy",
@@ -92,6 +95,7 @@ const router = createBrowserRouter([
         <PrivacyPolicyPage />
       </Suspense>
     ),
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/terms",
@@ -100,6 +104,7 @@ const router = createBrowserRouter([
         <TermsOfServicePage />
       </Suspense>
     ),
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/refund",
@@ -108,17 +113,19 @@ const router = createBrowserRouter([
         <RefundPolicyPage />
       </Suspense>
     ),
+    errorElement: <RouteErrorBoundary />,
   },
-  { path: "/login", element: <LoginPage /> },
-  { path: "/signup", element: <SignupPage /> },
-  { path: "/forgot-password", element: <ForgotPasswordPage /> },
-  { path: "/2fa", element: <TwoFactorPage /> },
+  { path: "/login", element: <LoginPage />, errorElement: <RouteErrorBoundary /> },
+  { path: "/signup", element: <SignupPage />, errorElement: <RouteErrorBoundary /> },
+  { path: "/forgot-password", element: <ForgotPasswordPage />, errorElement: <RouteErrorBoundary /> },
+  { path: "/2fa", element: <TwoFactorPage />, errorElement: <RouteErrorBoundary /> },
   {
     element: (
       <ProtectedRoute>
         <AppShell />
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorBoundary />,
     children: [
       { path: "dashboard", element: <DashboardPage /> },
       { path: "setup", element: <HostelSetupPage /> },
@@ -169,6 +176,7 @@ createRoot(document.getElementById("root")!).render(
         <ToastProvider>
           <RouterProvider router={router} />
           <Analytics />
+          <SpeedInsights />
         </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>
