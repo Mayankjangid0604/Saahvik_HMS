@@ -29,7 +29,7 @@ export function TermsOfServicePage() {
       <p>
         Subscriptions are prepaid and billed monthly, half-yearly, or yearly as selected. Prices
         are listed at{" "}
-        <a href="https://www.saahvik.com/pricing">www.saahvik.com/pricing</a>. We reserve the
+        <a href="https://www.saahvik.com/#pricing">www.saahvik.com</a>. We reserve the
         right to change pricing with 30 days&rsquo; notice. Continued use after a price change
         constitutes acceptance.
       </p>

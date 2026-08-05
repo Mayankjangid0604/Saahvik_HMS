@@ -327,6 +327,7 @@ function Wordmark({ withBadge = true }: { withBadge?: boolean }) {
 export function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
   const [cycle, setCycle] = useState<CycleId>("monthly");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -341,10 +342,19 @@ export function LandingPage() {
     const target = document.getElementById(id);
     if (!target) return;
     event.preventDefault();
+    setMobileNavOpen(false);
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     target.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
     history.replaceState(null, "", `#${id}`);
   }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobileNavOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
     <div className="landing">
@@ -368,6 +378,13 @@ export function LandingPage() {
             >
               Pricing
             </a>
+            <a
+              href="#contact"
+              className="landing-nav-link landing-nav-link-secondary"
+              onClick={(e) => scrollToSection(e, "contact")}
+            >
+              Contact
+            </a>
             <Link to="/login" className="landing-nav-link">
               Log in
             </Link>
@@ -375,8 +392,41 @@ export function LandingPage() {
               Get Started
             </Link>
           </nav>
+          <button
+            type="button"
+            className="nav-hamburger"
+            aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileNavOpen}
+            aria-controls="mobile-nav-drawer"
+            onClick={() => setMobileNavOpen((o) => !o)}
+          >
+            <span className="nav-hamburger-line" />
+            <span className="nav-hamburger-line" />
+            <span className="nav-hamburger-line" />
+          </button>
         </div>
       </header>
+      <div
+        id="mobile-nav-drawer"
+        className={`mobile-nav-drawer${mobileNavOpen ? " is-open" : ""}${scrolled ? " mobile-nav-drawer-scrolled" : ""}`}
+        aria-hidden={!mobileNavOpen}
+      >
+        <a href="#features" className="mobile-nav-link" onClick={(e) => scrollToSection(e, "features")}>Features</a>
+        <a href="#pricing" className="mobile-nav-link" onClick={(e) => scrollToSection(e, "pricing")}>Pricing</a>
+        <a href="#contact" className="mobile-nav-link" onClick={(e) => scrollToSection(e, "contact")}>Contact</a>
+        <div className="mobile-nav-divider" aria-hidden="true" />
+        <Link to="/login" className="mobile-nav-link" onClick={() => setMobileNavOpen(false)}>Log in</Link>
+        <div className="mobile-nav-cta">
+          <Link
+            to="/signup"
+            className="btn btn-gold"
+            style={{ width: "100%", justifyContent: "center" }}
+            onClick={() => setMobileNavOpen(false)}
+          >
+            Get Started
+          </Link>
+        </div>
+      </div>
 
       <main>
         <section className="landing-hero" aria-labelledby="hero-heading">
@@ -503,7 +553,7 @@ export function LandingPage() {
             </Reveal>
 
             <Reveal className="founding-banner">
-              <strong>Launch offer:</strong> the first 30 hostels get 6 months
+              <strong>Launch offer:</strong> the first 20 hostels get 6 months
               completely free, a founding-member price locked for life, and
               direct WhatsApp support from the founder.{" "}
               <a

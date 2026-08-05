@@ -1,6 +1,7 @@
 .legal-main {
   min-height: calc(100vh - 76px - 108px);
-  padding-block: clamp(48px, 7vw, 96px);
+  padding-top: calc(var(--nav-height) + clamp(48px, 7vw, 96px));
+  padding-bottom: clamp(48px, 7vw, 96px);
   background-color: var(--ivory);
 }
 

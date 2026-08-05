@@ -20,7 +20,7 @@ export function LegalLayout({ title, lastUpdated, children }: LegalLayoutProps) 
   return (
     <div className="landing">
       {/* Nav — always in scrolled state */}
-      <header className="landing-nav is-scrolled" style={{ position: "sticky" }}>
+      <header className="landing-nav is-scrolled">
         <div className="landing-container landing-nav-inner">
           <Link to="/" className="landing-brand" aria-label="Saahvik home">
             <Wordmark />
@@ -57,11 +57,11 @@ export function LegalLayout({ title, lastUpdated, children }: LegalLayoutProps) 
             <span aria-hidden="true">·</span>
             <a href="mailto:contact@saahvik.com">contact@saahvik.com</a>
             <span aria-hidden="true">·</span>
-            <Link to="/privacy">Privacy</Link>
+            <Link to="/privacy" className="landing-footer-link">Privacy</Link>
             <span aria-hidden="true">·</span>
-            <Link to="/terms">Terms</Link>
+            <Link to="/terms" className="landing-footer-link">Terms</Link>
             <span aria-hidden="true">·</span>
-            <Link to="/refund">Refund</Link>
+            <Link to="/refund" className="landing-footer-link">Refund</Link>
           </div>
           <span className="landing-footer-copyright">© 2026 Saahvik</span>
         </div>
