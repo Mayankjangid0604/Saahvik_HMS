@@ -121,7 +121,6 @@ export const PLANS: readonly Plan[] = [
     ],
     inheritsLabel: "Everything in Beginner, plus",
     features: [
-      "Parent/guardian login — one login covers multiple residents",
       "Resident self-service login — residents see their own fees & receipts",
       "Multi-building hierarchy with per-building floors",
       "Custom role creation, delegation & multi-level approvals",
