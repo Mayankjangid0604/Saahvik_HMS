@@ -18,6 +18,15 @@ import { RouteErrorBoundary } from "@/components/layout/RouteErrorBoundary";
 const LandingPage = lazy(() =>
   import("@/pages/Landing/LandingPage").then((m) => ({ default: m.LandingPage })),
 );
+const PrivacyPolicyPage = lazy(() =>
+  import("@/pages/legal/PrivacyPolicyPage").then((m) => ({ default: m.PrivacyPolicyPage })),
+);
+const TermsOfServicePage = lazy(() =>
+  import("@/pages/legal/TermsOfServicePage").then((m) => ({ default: m.TermsOfServicePage })),
+);
+const RefundPolicyPage = lazy(() =>
+  import("@/pages/legal/RefundPolicyPage").then((m) => ({ default: m.RefundPolicyPage })),
+);
 
 import { LoginPage } from "@/features/auth/LoginPage";
 import { SignupPage } from "@/features/auth/SignupPage";
@@ -75,6 +84,33 @@ const router = createBrowserRouter([
       // chunk fetch reads as a beat of nothing rather than a white flash.
       <Suspense fallback={<div style={{ minHeight: "100vh", backgroundColor: "#f8f5ef" }} />}>
         <LandingPage />
+      </Suspense>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/privacy",
+    element: (
+      <Suspense fallback={<div style={{ minHeight: "100vh", backgroundColor: "#f8f5ef" }} />}>
+        <PrivacyPolicyPage />
+      </Suspense>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/terms",
+    element: (
+      <Suspense fallback={<div style={{ minHeight: "100vh", backgroundColor: "#f8f5ef" }} />}>
+        <TermsOfServicePage />
+      </Suspense>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/refund",
+    element: (
+      <Suspense fallback={<div style={{ minHeight: "100vh", backgroundColor: "#f8f5ef" }} />}>
+        <RefundPolicyPage />
       </Suspense>
     ),
     errorElement: <RouteErrorBoundary />,
