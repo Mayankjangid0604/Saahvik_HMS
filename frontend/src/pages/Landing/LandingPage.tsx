@@ -740,6 +740,12 @@ export function LandingPage() {
             <a href="https://www.saahvik.com" target="_blank" rel="noreferrer">
               www.saahvik.com
             </a>
+            <span aria-hidden="true">·</span>
+            <Link to="/privacy" className="landing-footer-link">Privacy</Link>
+            <span aria-hidden="true">·</span>
+            <Link to="/terms" className="landing-footer-link">Terms</Link>
+            <span aria-hidden="true">·</span>
+            <Link to="/refund" className="landing-footer-link">Refund</Link>
           </div>
           <span className="landing-footer-copyright">© 2026 Saahvik</span>
         </div>

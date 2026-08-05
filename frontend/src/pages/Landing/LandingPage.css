@@ -1279,3 +1279,12 @@
     margin-inline: 18px;
   }
 }
+
+.landing-footer-link {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.25s var(--ease-out-lux);
+}
+.landing-footer-link:hover {
+  color: var(--gold-light);
+}
