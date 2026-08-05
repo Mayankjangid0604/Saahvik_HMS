@@ -59,7 +59,7 @@ export async function changePassword(input: {
   // Password change bumps tokenVersion server-side; the old JWT is revoked
   // and the response carries a fresh one — swap it in or the next request 401s.
   if (data.token) {
-    sessionStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(TOKEN_KEY, data.token);
   }
   return data;
 }

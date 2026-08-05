@@ -114,7 +114,7 @@ export interface EmailOtpVerifyResult {
   verified: boolean;
 }
 
-export type BillingCycle = "monthly" | "yearly";
+export type BillingCycle = "monthly" | "half_yearly" | "yearly";
 
 /** The plan choice made in the signup wizard. */
 export interface PlanSelection {

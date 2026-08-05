@@ -11,6 +11,7 @@ const basicPlan = PLANS.find((p) => p.id === "basic")!;
 
 /* Amounts due today, in paisa — matching the published landing page prices. */
 export const BASIC_MONTHLY_PAISA = 99_900; // ₹999
+export const BASIC_HALF_YEARLY_PAISA = 529_900; // ₹5,299
 export const BASIC_YEARLY_PAISA = 1_009_900; // ₹10,099
 
 export function StepPlan({
@@ -21,7 +22,12 @@ export function StepPlan({
   onBack: () => void;
 }) {
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
-  const paidAmount = cycle === "monthly" ? BASIC_MONTHLY_PAISA : BASIC_YEARLY_PAISA;
+  const paidAmount =
+    cycle === "monthly"
+      ? BASIC_MONTHLY_PAISA
+      : cycle === "half_yearly"
+        ? BASIC_HALF_YEARLY_PAISA
+        : BASIC_YEARLY_PAISA;
 
   return (
     <div className="space-y-4">
@@ -61,6 +67,7 @@ export function StepPlan({
             {(
               [
                 ["monthly", "Monthly"],
+                ["half_yearly", "Half-Yearly"],
                 ["yearly", "Yearly"],
               ] as const
             ).map(([id, label]) => (
@@ -83,9 +90,12 @@ export function StepPlan({
           <p className="mt-3 text-2xl font-semibold text-primary">
             {formatMoney(paidAmount)}
             <span className="text-xs font-normal text-muted">
-              /{cycle === "monthly" ? "month" : "year"}
+              /{cycle === "monthly" ? "month" : cycle === "half_yearly" ? "6 months" : "year"}
             </span>
           </p>
+          {cycle === "half_yearly" && (
+            <p className="text-xs text-emerald-700">≈ ₹883/month effective</p>
+          )}
           {cycle === "yearly" && (
             <p className="text-xs text-emerald-700">≈ ₹842/month effective</p>
           )}
